@@ -4,6 +4,7 @@ using System.IO;
 using SharpFileSystem;
 using Microsoft.IO;
 using static System.Buffers.Binary.BinaryPrimitives;
+using static Q2Viewer.Util;
 using System.Text;
 using System.Linq;
 
@@ -86,19 +87,9 @@ namespace Q2Viewer
 			for (uint i = 0; i < fileCount; i++)
 			{
 				_baseStream.Read(entryBytes);
-				int length = 56;
-				for (int j = 0; j < 56; j++)
-				{
-					if (entryBytes[j] == 0)
-					{
-						length = j; break;
-					}
-				}
-				if (length == 0)
-				{
+				var name = ReadNullTerminated(entryBytes.Slice(0, 56));
+				if (name == null)
 					throw new IOException("Found an empty name in file table");
-				}
-				var name = Encoding.UTF8.GetString(entryBytes.Slice(0, length));
 				var entryOffset = ReadUInt32LittleEndian(entryBytes.Slice(56));
 				var entrySize = ReadUInt32LittleEndian(entryBytes.Slice(60));
 
