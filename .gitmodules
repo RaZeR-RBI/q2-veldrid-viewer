@@ -1,0 +1,6 @@
+[submodule "External/FxSharpFileSystem"]
+	path = External/FxSharpFileSystem
+	url = https://github.com/MBaldessari77/FxSharpFileSystem.git
+[submodule "External/Imagini"]
+	path = External/Imagini
+	url = https://github.com/project-grove/imagini.git
