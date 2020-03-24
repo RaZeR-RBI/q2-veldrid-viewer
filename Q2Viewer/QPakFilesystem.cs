@@ -7,7 +7,7 @@ using static System.Buffers.Binary.BinaryPrimitives;
 using System.Text;
 using System.Linq;
 
-namespace QPakFilesystem
+namespace Q2Viewer
 {
 	public class QPakFS : IFileSystem
 	{

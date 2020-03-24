@@ -15,7 +15,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\QPakFilesystem\QPakFilesystem.csproj" />
+    <ProjectReference Include="..\Q2Viewer\Q2Viewer.csproj" />
   </ItemGroup>
 
 </Project>
