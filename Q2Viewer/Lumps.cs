@@ -27,6 +27,18 @@ namespace Q2Viewer
 		}
 	}
 
+	public struct LUShortValue : ILumpData
+	{
+		public ushort Value;
+
+		public int Size => 2;
+
+		public void Read(ReadOnlySpan<byte> bytes)
+		{
+			Value = ReadUInt16LittleEndian(bytes);
+		}
+	}
+
 	public struct LIntValue : ILumpData
 	{
 		public int Value;
@@ -230,7 +242,7 @@ namespace Q2Viewer
 		}
 	}
 
-	public struct Node : ILumpData
+	public struct LNode : ILumpData
 	{
 		public int PlaneId;
 		public int Children1;
@@ -285,6 +297,64 @@ namespace Q2Viewer
 			HeadNode = ReadInt32LittleEndian(bytes.Slice(36));
 			FirstFace = ReadInt32LittleEndian(bytes.Slice(40));
 			NumFaces = ReadInt32LittleEndian(bytes.Slice(44));
+		}
+	}
+
+	public struct LBrush : ILumpData
+	{
+		public int FirstSide;
+		public int NumSides;
+		public int Contents;
+
+		public int Size => 4 * 3;
+
+		public void Read(ReadOnlySpan<byte> bytes)
+		{
+			FirstSide = ReadInt32LittleEndian(bytes);
+			NumSides = ReadInt32LittleEndian(bytes.Slice(4));
+			Contents = ReadInt32LittleEndian(bytes.Slice(8));
+		}
+	}
+
+	public struct LBrushSide : ILumpData
+	{
+		public ushort PlaneId;
+		public short TexInfoId;
+
+		public int Size => 2 * 2;
+
+		public void Read(ReadOnlySpan<byte> bytes)
+		{
+			PlaneId = ReadUInt16LittleEndian(bytes);
+			TexInfoId = ReadInt16LittleEndian(bytes);
+		}
+	}
+
+	public struct LArea : ILumpData
+	{
+		public int NumAreaPortals;
+		public int FirstAreaPortal;
+
+		public int Size => 4 * 2;
+
+		public void Read(ReadOnlySpan<byte> bytes)
+		{
+			NumAreaPortals = ReadInt32LittleEndian(bytes);
+			FirstAreaPortal = ReadInt32LittleEndian(bytes.Slice(4));
+		}
+	}
+
+	public struct LAreaPortal : ILumpData
+	{
+		public int PortalId;
+		public int OtherArea;
+
+		public int Size => 4 * 2;
+
+		public void Read(ReadOnlySpan<byte> bytes)
+		{
+			PortalId = ReadInt32LittleEndian(bytes);
+			OtherArea = ReadInt32LittleEndian(bytes.Slice(4));
 		}
 	}
 }
