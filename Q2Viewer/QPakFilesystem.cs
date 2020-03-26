@@ -110,25 +110,7 @@ namespace Q2Viewer
 			try
 			{
 				_baseStream.Seek(entry.Offset, SeekOrigin.Begin);
-				Span<byte> buffer = stackalloc byte[BufferSize];
-				var curOffset = 0;
-				var end = (int)entry.Size;
-				while (curOffset < end)
-				{
-					var bytesRead = _baseStream.Read(buffer);
-					if (end - curOffset < BufferSize)
-					{
-						newStream.Write(buffer.Slice(0, end - curOffset));
-						break;
-					}
-					else
-					{
-						if (bytesRead != BufferSize)
-							throw new EndOfStreamException("Unexpected end of stream");
-						newStream.Write(buffer);
-					}
-					curOffset += BufferSize;
-				}
+				ChunkedStreamRead(_baseStream, newStream, (int)entry.Size);
 			}
 			catch (Exception ex)
 			{

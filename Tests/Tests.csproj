@@ -20,5 +20,6 @@
 
   <ItemGroup>
     <None Update="box.bsp" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="clip.wal" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

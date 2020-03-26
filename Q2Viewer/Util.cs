@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Numerics;
 using System.Text;
 
@@ -37,6 +38,28 @@ namespace Q2Viewer
 				BitConverter.ToSingle(bytes.Slice(8)),
 				BitConverter.ToSingle(bytes.Slice(12))
 			);
+		}
+
+		public static void ChunkedStreamRead(Stream src, MemoryStream dst, int length, int chunkSize = 4096)
+		{
+			Span<byte> buffer = stackalloc byte[chunkSize];
+			var curOffset = 0;
+			while (curOffset < length)
+			{
+				var bytesRead = src.Read(buffer);
+				if (length - curOffset < chunkSize)
+				{
+					dst.Write(buffer.Slice(0, (int)(length - curOffset)));
+					break;
+				}
+				else
+				{
+					if (bytesRead != chunkSize)
+						throw new EndOfStreamException("Unexpected end of stream");
+					dst.Write(buffer);
+				}
+				curOffset += chunkSize;
+			}
 		}
 	}
 }
