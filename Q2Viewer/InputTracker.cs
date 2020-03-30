@@ -1,0 +1,58 @@
+using System.Collections.Generic;
+using System.Numerics;
+using Imagini;
+
+namespace Q2Viewer
+{
+	public static class InputTracker
+	{
+		public static Vector2 MousePosition { get; private set; }
+
+		public static Vector2 MouseDelta { get; private set; }
+
+		private static HashSet<Keycode> _pressedKeys = new HashSet<Keycode>(10);
+		private static HashSet<MouseButton> _mouseButtons = new HashSet<MouseButton>(10);
+
+
+		public static void Connect(AppBase app)
+		{
+			app.Events.Keyboard.KeyPressed += OnKeyPressed;
+			app.Events.Keyboard.KeyReleased += OnKeyReleased;
+			app.Events.Mouse.MouseMoved += OnMouseMoved;
+		}
+
+		public static void Disconnect(AppBase app)
+		{
+			app.Events.Keyboard.KeyPressed -= OnKeyPressed;
+			app.Events.Keyboard.KeyReleased -= OnKeyReleased;
+			app.Events.Mouse.MouseMoved -= OnMouseMoved;
+		}
+
+		public static void AfterUpdate()
+		{
+			MouseDelta = Vector2.Zero;
+		}
+
+		public static bool GetKey(Keycode keycode) => _pressedKeys.Contains(keycode);
+
+		public static bool GetMouseButton(MouseButton b) => _mouseButtons.Contains(b);
+
+		private static void OnKeyPressed(object sender, KeyboardEventArgs args) =>
+			_pressedKeys.Add(args.Key.Keycode);
+
+		private static void OnKeyReleased(object sender, KeyboardEventArgs args) =>
+			_pressedKeys.Remove(args.Key.Keycode);
+
+		private static void OnMouseMoved(object sender, MouseMoveEventArgs args)
+		{
+			MousePosition = new Vector2(args.X, args.Y);
+			MouseDelta = new Vector2(args.X, args.Y);
+		}
+
+		private static void OnMouseButtonPressed(object sender, MouseButtonEventArgs args) =>
+			_mouseButtons.Add(args.Button);
+
+		private static void OnMouseButtonReleased(object sender, MouseButtonEventArgs args) =>
+			_mouseButtons.Remove(args.Button);
+	}
+}

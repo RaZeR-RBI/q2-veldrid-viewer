@@ -2,12 +2,16 @@
 
   <ItemGroup>
     <ProjectReference Include="..\External\FxSharpFileSystem\SharpFileSystem\SharpFileSystem.csproj" />
+    <ProjectReference Include="..\External\Imagini\Imagini.Core\Imagini.Core.csproj" />
+    <ProjectReference Include="..\External\Imagini\Imagini.Veldrid\Imagini.Veldrid.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.IO.RecyclableMemoryStream" Version="1.3.3" />
     <PackageReference Include="System.Memory" Version="4.5.3" />
     <PackageReference Include="System.Numerics.Vectors" Version="4.5.0" />
+    <PackageReference Include="Veldrid" Version="4.7.0" />
+    <PackageReference Include="Veldrid.StartupUtilities" Version="4.7.0" />
   </ItemGroup>
 
   <PropertyGroup>

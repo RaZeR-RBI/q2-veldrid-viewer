@@ -6,7 +6,9 @@ namespace Q2Viewer
 	{
 		static void Main(string[] args)
 		{
-			Console.WriteLine("Hello World!");
+			// TODO: Read args properly
+			var bspPath = string.Join(' ', args);
+			(new Q2Viewer(bspPath)).Run();
 		}
 	}
 }
