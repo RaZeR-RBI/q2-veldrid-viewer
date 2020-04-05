@@ -101,14 +101,34 @@ namespace Q2Viewer
 			Vector2 mouseDelta = InputTracker.MousePosition - _previousMousePos;
 			_previousMousePos = InputTracker.MousePosition;
 
+			var shouldUpdateView = false;
+			if (InputTracker.GetKey(Keycode.LEFT))
+			{
+				Yaw += deltaSeconds * 2.0f;
+			}
+			if (InputTracker.GetKey(Keycode.RIGHT))
+			{
+				Yaw -= deltaSeconds * 2.0f;
+			}
+			if (InputTracker.GetKey(Keycode.UP))
+			{
+				Pitch += deltaSeconds * 2.0f;
+			}
+			if (InputTracker.GetKey(Keycode.DOWN))
+			{
+				Pitch -= deltaSeconds * 2.0f;
+			}
+
 			if (InputTracker.GetMouseButton(MB.Left) || InputTracker.GetMouseButton(MB.Right))
 			{
 				Yaw += -mouseDelta.X * 0.01f;
 				Pitch += -mouseDelta.Y * 0.01f;
 				Pitch = Clamp(Pitch, -1.55f, 1.55f);
 
-				UpdateViewMatrix();
+				shouldUpdateView = true;
 			}
+			if (shouldUpdateView)
+				UpdateViewMatrix();
 		}
 
 		private float Clamp(float value, float min, float max)

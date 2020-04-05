@@ -8,8 +8,13 @@ namespace Q2Viewer
 {
 	public class Q2Viewer : VeldridApp
 	{
-		private Camera _camera;
-		private CommandList _cmd;
+		private readonly Camera _camera;
+		private CommandList _cl;
+		/* View and projection matrices */
+		private DeviceBuffer _viewBuf;
+		private DeviceBuffer _projBuf;
+		private DebugPrimitives _debugPrimitives;
+
 
 		// TODO: Read paths to PAKs to get textures from
 		public Q2Viewer(string bspPath) : base(
@@ -18,7 +23,15 @@ namespace Q2Viewer
 				WindowWidth = 800,
 				WindowHeight = 600,
 				IsResizable = true,
-			}
+			},
+			new GraphicsDeviceOptions(
+				debug: false,
+				swapchainDepthFormat: PixelFormat.R16_UNorm,
+				syncToVerticalBlank: true,
+				resourceBindingModel: ResourceBindingModel.Improved,
+				preferDepthRangeZeroToOne: true,
+				preferStandardClipSpaceYDirection: true
+			)
 		)
 		{
 			_camera = new Camera(800, 600);
@@ -29,13 +42,18 @@ namespace Q2Viewer
 			};
 			InputTracker.Connect(this);
 			// TODO: Read player_info_start entity from bsp
-			_camera.Position = new Vector3(-100.0f, 0.0f, 0.0f);
+			_camera.Position = new Vector3(25.0f, 15.0f, 25.0f);
+			_camera.Yaw = MathF.PI / 4;
+			_camera.Pitch = -MathF.PI / 8;
 		}
 
 		protected override void Initialize()
 		{
 			var factory = Graphics.ResourceFactory;
-			_cmd = factory.CreateCommandList();
+			_cl = factory.CreateCommandList();
+			_viewBuf = factory.CreateBuffer(new BufferDescription(64, BufferUsage.UniformBuffer | BufferUsage.Dynamic));
+			_projBuf = factory.CreateBuffer(new BufferDescription(64, BufferUsage.UniformBuffer | BufferUsage.Dynamic));
+			_debugPrimitives = new DebugPrimitives(Graphics, _viewBuf, _projBuf, _camera);
 		}
 
 		protected override void Update(TimeSpan frameTime)
@@ -46,17 +64,22 @@ namespace Q2Viewer
 
 		protected override void Draw(TimeSpan frameTime)
 		{
-			_cmd.Begin();
-			_cmd.SetFramebuffer(Graphics.SwapchainFramebuffer);
-			_cmd.ClearColorTarget(0, RgbaFloat.CornflowerBlue);
-			_cmd.End();
-			Graphics.SubmitCommands(_cmd);
+			_cl.Begin();
+			_cl.SetFramebuffer(Graphics.SwapchainFramebuffer);
+			_cl.ClearColorTarget(0, RgbaFloat.CornflowerBlue);
+			_cl.ClearDepthStencil(1.0f);
+			_cl.UpdateBuffer(_viewBuf, 0, _camera.ViewMatrix);
+			_cl.UpdateBuffer(_projBuf, 0, _camera.ProjectionMatrix);
+			_debugPrimitives.DrawGizmo(_cl);
+			_debugPrimitives.DrawCube(_cl, Vector3.Zero);
+			_cl.End();
+			Graphics.SubmitCommands(_cl);
 		}
 
 		protected override void AfterDraw(TimeSpan frameTime)
 		{
+			Graphics.SwapBuffers(Graphics.MainSwapchain);
 			Graphics.WaitForIdle();
-			Graphics.SwapBuffers();
 		}
 	}
 }

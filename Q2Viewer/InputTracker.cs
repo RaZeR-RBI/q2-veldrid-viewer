@@ -19,6 +19,8 @@ namespace Q2Viewer
 			app.Events.Keyboard.KeyPressed += OnKeyPressed;
 			app.Events.Keyboard.KeyReleased += OnKeyReleased;
 			app.Events.Mouse.MouseMoved += OnMouseMoved;
+			app.Events.Mouse.MouseButtonPressed += OnMouseButtonPressed;
+			app.Events.Mouse.MouseButtonReleased += OnMouseButtonReleased;
 		}
 
 		public static void Disconnect(AppBase app)
@@ -26,6 +28,8 @@ namespace Q2Viewer
 			app.Events.Keyboard.KeyPressed -= OnKeyPressed;
 			app.Events.Keyboard.KeyReleased -= OnKeyReleased;
 			app.Events.Mouse.MouseMoved -= OnMouseMoved;
+			app.Events.Mouse.MouseButtonPressed -= OnMouseButtonPressed;
+			app.Events.Mouse.MouseButtonReleased -= OnMouseButtonReleased;
 		}
 
 		public static void AfterUpdate()
