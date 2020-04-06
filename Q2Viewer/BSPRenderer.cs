@@ -22,23 +22,18 @@ namespace Q2Viewer
 			_reader = new BSPReader(file);
 			_allocator = allocator;
 
-			var worldspawnWireframe = BuildDebugEdgeBuffer(gd,
-				_reader.GetModels().First(),
-				RgbaFloat.White,
-				out uint wsEdgeCount);
-
-			_wireframes.Add((worldspawnWireframe, wsEdgeCount));
-			foreach (var model in _reader.GetModels().Skip(1))
-			{
-				var wf = BuildDebugEdgeBuffer(gd,
-				model, RgbaFloat.Red, out uint edgeCount);
-				_wireframes.Add((wf, edgeCount));
-			}
-
 			foreach (var model in _reader.GetModels())
 			{
 				var mb = BuildDebugModelBuffers(gd, model, out uint count);
-				_debugModels.Add((mb, count));
+				if (mb != null)
+				{
+					_debugModels.Add((mb, count));
+					continue;
+				}
+				// we got an invisible model - a trigger or something
+				var wf = BuildDebugEdgeBuffer(gd,
+				model, RgbaFloat.Red, out uint edgeCount);
+				_wireframes.Add((wf, edgeCount));
 			}
 		}
 
@@ -90,8 +85,6 @@ namespace Q2Viewer
 
 			var vertexSize = VertexColor.SizeInBytes;
 			var vertices = _allocator.Rent<VertexColor>((int)count);
-			var buffer = gd.ResourceFactory.CreateBuffer(
-				new BufferDescription(count * vertexSize, BufferUsage.VertexBuffer));
 			var memory = new Memory<VertexColor>(vertices, 0, (int)count);
 
 			var offset = 0;
@@ -112,6 +105,14 @@ namespace Q2Viewer
 				vc.CopyTo(memory.Slice(offset, triangleCount * 3).Span);
 				offset += vc.Length;
 			});
+			count = (uint)offset;
+			if (count == 0)
+			{
+				_allocator.Return(vertices);
+				return null;
+			}
+			var buffer = gd.ResourceFactory.CreateBuffer(
+				new BufferDescription(count * vertexSize, BufferUsage.VertexBuffer));
 
 			var sizeInBytes = count * vertexSize;
 			using (var handle = memory.Pin())
@@ -137,9 +138,9 @@ namespace Q2Viewer
 
 		public void DebugDraw(CommandList cl, DebugPrimitives helper)
 		{
-			var worldspawn = _debugModels.First();
-			helper.DrawTriangles(cl, Matrix4x4.Identity, worldspawn.Item1, worldspawn.Item2);
-			foreach (var (vb, count) in _wireframes.Skip(1))
+			foreach (var (vb, count) in _debugModels)
+				helper.DrawTriangles(cl, Matrix4x4.Identity, vb, count);
+			foreach (var (vb, count) in _wireframes)
 				helper.DrawLines(cl, Matrix4x4.Identity, vb, count);
 		}
 	}
