@@ -25,8 +25,8 @@ namespace Q2Viewer
 		{
 			return new Vector3(
 				BitConverter.ToSingle(bytes.Slice(0)),
-				BitConverter.ToSingle(bytes.Slice(4)),
-				BitConverter.ToSingle(bytes.Slice(8))
+				BitConverter.ToSingle(bytes.Slice(8)),
+				-BitConverter.ToSingle(bytes.Slice(4))
 			);
 		}
 
@@ -34,8 +34,8 @@ namespace Q2Viewer
 		{
 			return new Vector4(
 				BitConverter.ToSingle(bytes.Slice(0)),
-				BitConverter.ToSingle(bytes.Slice(4)),
 				BitConverter.ToSingle(bytes.Slice(8)),
+				-BitConverter.ToSingle(bytes.Slice(4)),
 				BitConverter.ToSingle(bytes.Slice(12))
 			);
 		}

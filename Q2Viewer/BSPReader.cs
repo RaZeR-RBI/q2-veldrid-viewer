@@ -16,31 +16,31 @@ namespace Q2Viewer
 
 	public class BSPReader
 	{
-		private readonly BSPFile _file;
-		public BSPReader(BSPFile file) => _file = file;
+		public readonly BSPFile File;
+		public BSPReader(BSPFile file) => File = file;
 
 		public IEnumerable<LModel> GetModels() =>
-			_file.Submodels.Data;
+			File.Submodels.Data;
 
 		public void ProcessVertices(LModel model, FaceVisitorCallback callback)
 		{
 			for (var i = model.FirstFace; i < model.FirstFace + model.NumFaces; i++)
 			{
-				var face = _file.Faces.Data[i];
+				var face = File.Faces.Data[i];
 				Span<Entry<VertexTL>> vertices =
 					stackalloc Entry<VertexTL>[face.EdgeCount];
 
 				var k = 0;
 				for (var j = face.FirstEdgeId; j < face.FirstEdgeId + face.EdgeCount; j++)
 				{
-					var id = _file.SurfaceEdges.Data[j].Value;
+					var id = File.SurfaceEdges.Data[j].Value;
 					var vertexId = id > 0 ?
-						_file.Edges.Data[id].VertexID1 :
-						_file.Edges.Data[-id].VertexID2;
+						File.Edges.Data[id].VertexID1 :
+						File.Edges.Data[-id].VertexID2;
 
 					var vertex = new VertexTL();
-					var tex = _file.TextureInfos.Data[face.TextureInfoId];
-					vertex.Position = _file.Vertexes.Data[vertexId].Point;
+					var tex = File.TextureInfos.Data[face.TextureInfoId];
+					vertex.Position = File.Vertexes.Data[vertexId].Point;
 					// TODO: Load textures and calculate texture coords
 					// TODO: Load lightmaps and calculate lightmap coords
 					vertices[k].Index = vertexId;

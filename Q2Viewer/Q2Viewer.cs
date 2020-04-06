@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Numerics;
 using Imagini;
 using Imagini.Veldrid;
@@ -14,10 +16,12 @@ namespace Q2Viewer
 		private DeviceBuffer _viewBuf;
 		private DeviceBuffer _projBuf;
 		private DebugPrimitives _debugPrimitives;
+		private BSPRenderer _renderer;
+		private readonly Options _options;
 
 
 		// TODO: Read paths to PAKs to get textures from
-		public Q2Viewer(string bspPath) : base(
+		public Q2Viewer(Options options) : base(
 			new WindowSettings()
 			{
 				WindowWidth = 800,
@@ -34,6 +38,7 @@ namespace Q2Viewer
 			)
 		)
 		{
+			_options = options;
 			_camera = new Camera(800, 600);
 			this.Resized += (s, e) =>
 			{
@@ -54,6 +59,11 @@ namespace Q2Viewer
 			_viewBuf = factory.CreateBuffer(new BufferDescription(64, BufferUsage.UniformBuffer | BufferUsage.Dynamic));
 			_projBuf = factory.CreateBuffer(new BufferDescription(64, BufferUsage.UniformBuffer | BufferUsage.Dynamic));
 			_debugPrimitives = new DebugPrimitives(Graphics, _viewBuf, _projBuf, _camera);
+
+			var bspFileStream = File.OpenRead(_options.MapPath);
+			var bspFile = new BSPFile(bspFileStream, SharedArrayPoolAllocator.Instance);
+			bspFileStream.Close();
+			_renderer = new BSPRenderer(bspFile, SharedArrayPoolAllocator.Instance, Graphics);
 		}
 
 		protected override void Update(TimeSpan frameTime)
@@ -72,6 +82,7 @@ namespace Q2Viewer
 			_cl.UpdateBuffer(_projBuf, 0, _camera.ProjectionMatrix);
 			_debugPrimitives.DrawGizmo(_cl);
 			_debugPrimitives.DrawCube(_cl, Vector3.Zero);
+			_renderer.DrawWireframe(_cl, _debugPrimitives);
 			_cl.End();
 			Graphics.SubmitCommands(_cl);
 		}

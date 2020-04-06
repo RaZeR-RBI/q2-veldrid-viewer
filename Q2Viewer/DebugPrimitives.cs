@@ -137,7 +137,7 @@ void main()
 			));
 			_device.UpdateBuffer(_gizmoVertexBuffer, 0, s_gizmoVertices);
 
-			var cubeVerts = GetCubeVertices();
+			var cubeVerts = GetCubeVertices(RgbaFloat.Green);
 			var cubeIndices = GetCubeIndices();
 			_cubeVertexBuffer = factory.CreateBuffer(new BufferDescription(
 				VertexColor.SizeInBytes * (uint)cubeVerts.Length, BufferUsage.VertexBuffer
@@ -149,15 +149,22 @@ void main()
 			_device.UpdateBuffer(_cubeIndexBuffer, 0, cubeIndices);
 		}
 
-		public void DrawGizmo(CommandList cl)
+		public void DrawLines(
+			CommandList cl,
+			Matrix4x4 worldMatrix,
+			DeviceBuffer lineBuffer,
+			uint count)
 		{
-			cl.UpdateBuffer(_worldBuffer, 0, Matrix4x4.Identity);
+			cl.UpdateBuffer(_worldBuffer, 0, worldMatrix);
 			cl.SetPipeline(_linePipeline);
-			cl.SetVertexBuffer(0, _gizmoVertexBuffer);
+			cl.SetVertexBuffer(0, lineBuffer);
 			cl.SetGraphicsResourceSet(0, _projViewSet);
 			cl.SetGraphicsResourceSet(1, _worldBufferSet);
-			cl.Draw(6);
+			cl.Draw(count);
 		}
+
+		public void DrawGizmo(CommandList cl) =>
+			DrawLines(cl, Matrix4x4.Identity, _gizmoVertexBuffer, 6);
 
 		public void DrawCube(CommandList cl, Vector3 position)
 		{
@@ -171,40 +178,40 @@ void main()
 			cl.DrawIndexed(36, 1, 0, 0, 0);
 		}
 
-		private static VertexColor[] GetCubeVertices()
+		private static VertexColor[] GetCubeVertices(RgbaFloat color)
 		{
 			VertexColor[] vertices = new VertexColor[]
 			{
                 // Top
-                new VertexColor(new Vector3(-0.5f, +0.5f, -0.5f), RgbaFloat.Green),
-				new VertexColor(new Vector3(+0.5f, +0.5f, -0.5f), RgbaFloat.Green),
-				new VertexColor(new Vector3(+0.5f, +0.5f, +0.5f), RgbaFloat.Green),
-				new VertexColor(new Vector3(-0.5f, +0.5f, +0.5f), RgbaFloat.Green),
+                new VertexColor(new Vector3(-0.5f, +0.5f, -0.5f), color),
+				new VertexColor(new Vector3(+0.5f, +0.5f, -0.5f), color),
+				new VertexColor(new Vector3(+0.5f, +0.5f, +0.5f), color),
+				new VertexColor(new Vector3(-0.5f, +0.5f, +0.5f), color),
                 // Bottom
-                new VertexColor(new Vector3(-0.5f,-0.5f, +0.5f),  RgbaFloat.Green),
-				new VertexColor(new Vector3(+0.5f,-0.5f, +0.5f),  RgbaFloat.Green),
-				new VertexColor(new Vector3(+0.5f,-0.5f, -0.5f),  RgbaFloat.Green),
-				new VertexColor(new Vector3(-0.5f,-0.5f, -0.5f),  RgbaFloat.Green),
+                new VertexColor(new Vector3(-0.5f,-0.5f, +0.5f),  color),
+				new VertexColor(new Vector3(+0.5f,-0.5f, +0.5f),  color),
+				new VertexColor(new Vector3(+0.5f,-0.5f, -0.5f),  color),
+				new VertexColor(new Vector3(-0.5f,-0.5f, -0.5f),  color),
                 // Left
-                new VertexColor(new Vector3(-0.5f, +0.5f, -0.5f), RgbaFloat.Green),
-				new VertexColor(new Vector3(-0.5f, +0.5f, +0.5f), RgbaFloat.Green),
-				new VertexColor(new Vector3(-0.5f, -0.5f, +0.5f), RgbaFloat.Green),
-				new VertexColor(new Vector3(-0.5f, -0.5f, -0.5f), RgbaFloat.Green),
+                new VertexColor(new Vector3(-0.5f, +0.5f, -0.5f), color),
+				new VertexColor(new Vector3(-0.5f, +0.5f, +0.5f), color),
+				new VertexColor(new Vector3(-0.5f, -0.5f, +0.5f), color),
+				new VertexColor(new Vector3(-0.5f, -0.5f, -0.5f), color),
                 // Right
-                new VertexColor(new Vector3(+0.5f, +0.5f, +0.5f), RgbaFloat.Green),
-				new VertexColor(new Vector3(+0.5f, +0.5f, -0.5f), RgbaFloat.Green),
-				new VertexColor(new Vector3(+0.5f, -0.5f, -0.5f), RgbaFloat.Green),
-				new VertexColor(new Vector3(+0.5f, -0.5f, +0.5f), RgbaFloat.Green),
+                new VertexColor(new Vector3(+0.5f, +0.5f, +0.5f), color),
+				new VertexColor(new Vector3(+0.5f, +0.5f, -0.5f), color),
+				new VertexColor(new Vector3(+0.5f, -0.5f, -0.5f), color),
+				new VertexColor(new Vector3(+0.5f, -0.5f, +0.5f), color),
                 // Back
-                new VertexColor(new Vector3(+0.5f, +0.5f, -0.5f), RgbaFloat.Green),
-				new VertexColor(new Vector3(-0.5f, +0.5f, -0.5f), RgbaFloat.Green),
-				new VertexColor(new Vector3(-0.5f, -0.5f, -0.5f), RgbaFloat.Green),
-				new VertexColor(new Vector3(+0.5f, -0.5f, -0.5f), RgbaFloat.Green),
+                new VertexColor(new Vector3(+0.5f, +0.5f, -0.5f), color),
+				new VertexColor(new Vector3(-0.5f, +0.5f, -0.5f), color),
+				new VertexColor(new Vector3(-0.5f, -0.5f, -0.5f), color),
+				new VertexColor(new Vector3(+0.5f, -0.5f, -0.5f), color),
                 // Front
-                new VertexColor(new Vector3(-0.5f, +0.5f, +0.5f), RgbaFloat.Green),
-				new VertexColor(new Vector3(+0.5f, +0.5f, +0.5f), RgbaFloat.Green),
-				new VertexColor(new Vector3(+0.5f, -0.5f, +0.5f), RgbaFloat.Green),
-				new VertexColor(new Vector3(-0.5f, -0.5f, +0.5f), RgbaFloat.Green),
+                new VertexColor(new Vector3(-0.5f, +0.5f, +0.5f), color),
+				new VertexColor(new Vector3(+0.5f, +0.5f, +0.5f), color),
+				new VertexColor(new Vector3(+0.5f, -0.5f, +0.5f), color),
+				new VertexColor(new Vector3(-0.5f, -0.5f, +0.5f), color),
 			};
 
 			return vertices;
