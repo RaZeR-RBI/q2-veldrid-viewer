@@ -1,7 +1,11 @@
 using System;
+using System.Collections.Generic;
+using System.Drawing;
 using System.IO;
+using System.Linq;
 using System.Numerics;
 using System.Text;
+using Veldrid;
 
 namespace Q2Viewer
 {
@@ -61,5 +65,26 @@ namespace Q2Viewer
 				curOffset += chunkSize;
 			}
 		}
+
+		public static RgbaFloat ToRgbaFloat(this Color color) =>
+			new RgbaFloat(
+				(float)color.R / 255f,
+				(float)color.G / 255f,
+				(float)color.B / 255f,
+				(float)color.A / 255f
+			);
+
+		private static readonly List<RgbaFloat> s_colors = null;
+		private static readonly Random s_rnd = new Random();
+		static Util()
+		{
+			s_colors = ((KnownColor[])Enum.GetValues(typeof(KnownColor)))
+				.Select(Color.FromKnownColor)
+				.Select(ToRgbaFloat)
+				.ToList();
+		}
+
+		public static RgbaFloat GetRandomColor() =>
+			s_colors[s_rnd.Next(0, s_colors.Count)];
 	}
 }

@@ -166,16 +166,43 @@ void main()
 		public void DrawGizmo(CommandList cl) =>
 			DrawLines(cl, Matrix4x4.Identity, _gizmoVertexBuffer, 6);
 
+		public void DrawTriangles(
+			CommandList cl,
+			Matrix4x4 worldMatrix,
+			DeviceBuffer vb,
+			uint count
+		)
+		{
+			cl.UpdateBuffer(_worldBuffer, 0, worldMatrix);
+			cl.SetPipeline(_tlPipeline);
+			cl.SetVertexBuffer(0, vb);
+			cl.SetGraphicsResourceSet(0, _projViewSet);
+			cl.SetGraphicsResourceSet(1, _worldBufferSet);
+			cl.Draw(count);
+		}
+
+		public void DrawTriangles(
+			CommandList cl,
+			Matrix4x4 worldMatrix,
+			DeviceBuffer vb,
+			DeviceBuffer ib,
+			IndexFormat indexFormat,
+			uint count
+		)
+		{
+			cl.UpdateBuffer(_worldBuffer, 0, worldMatrix);
+			cl.SetPipeline(_tlPipeline);
+			cl.SetVertexBuffer(0, vb);
+			cl.SetIndexBuffer(ib, indexFormat);
+			cl.SetGraphicsResourceSet(0, _projViewSet);
+			cl.SetGraphicsResourceSet(1, _worldBufferSet);
+			cl.DrawIndexed(count);
+		}
+
 		public void DrawCube(CommandList cl, Vector3 position)
 		{
 			var world = Matrix4x4.CreateTranslation(position);
-			cl.UpdateBuffer(_worldBuffer, 0, world);
-			cl.SetPipeline(_tlPipeline);
-			cl.SetVertexBuffer(0, _cubeVertexBuffer);
-			cl.SetIndexBuffer(_cubeIndexBuffer, IndexFormat.UInt16);
-			cl.SetGraphicsResourceSet(0, _projViewSet);
-			cl.SetGraphicsResourceSet(1, _worldBufferSet);
-			cl.DrawIndexed(36, 1, 0, 0, 0);
+			DrawTriangles(cl, world, _cubeVertexBuffer, _cubeIndexBuffer, IndexFormat.UInt16, 36);
 		}
 
 		private static VertexColor[] GetCubeVertices(RgbaFloat color)

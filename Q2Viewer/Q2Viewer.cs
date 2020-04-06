@@ -82,7 +82,7 @@ namespace Q2Viewer
 			_cl.UpdateBuffer(_projBuf, 0, _camera.ProjectionMatrix);
 			_debugPrimitives.DrawGizmo(_cl);
 			_debugPrimitives.DrawCube(_cl, Vector3.Zero);
-			_renderer.DrawWireframe(_cl, _debugPrimitives);
+			_renderer.DebugDraw(_cl, _debugPrimitives);
 			_cl.End();
 			Graphics.SubmitCommands(_cl);
 		}
