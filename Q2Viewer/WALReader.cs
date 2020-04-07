@@ -12,6 +12,7 @@ namespace Q2Viewer
 		public int Height;
 		public byte[] Pixels;
 	}
+
 	public struct WALTexture
 	{
 		public string Name;
@@ -22,7 +23,7 @@ namespace Q2Viewer
 		public WALMipData[] Mips;
 		public int MipCount;
 
-		public void Dispose(IArrayAllocator allocator)
+		public void DisposePixelData(IArrayAllocator allocator)
 		{
 			for (var i = 0; i < MipCount; i++)
 				allocator.Return(Mips[i].Pixels);

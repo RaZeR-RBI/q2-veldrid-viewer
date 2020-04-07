@@ -103,7 +103,7 @@ void main()
 				));
 
 			_linePipeline = factory.CreateGraphicsPipeline(new GraphicsPipelineDescription(
-				BlendStateDescription.SingleOverrideBlend,
+				BlendStateDescription.Empty,
 				DepthStencilStateDescription.DepthOnlyLessEqual,
 				RasterizerStateDescription.CullNone,
 				PrimitiveTopology.LineList,
@@ -113,7 +113,7 @@ void main()
 			));
 
 			_tlPipeline = factory.CreateGraphicsPipeline(new GraphicsPipelineDescription(
-				BlendStateDescription.SingleOverrideBlend,
+				BlendStateDescription.Empty,
 				DepthStencilStateDescription.DepthOnlyLessEqual,
 				RasterizerStateDescription.Default,
 				PrimitiveTopology.TriangleList,

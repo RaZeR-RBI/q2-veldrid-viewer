@@ -20,7 +20,7 @@ namespace Tests
 				var bsp = new BSPFile(stream, SharedArrayPoolAllocator.Instance);
 				var reader = new BSPReader(bsp);
 				var worldspawn = reader.GetModels().First();
-				var data = new List<(LFace face, Entry<VertexTL>[] vertices)>();
+				var data = new List<(LFace face, Entry<VertexNTL>[] vertices)>();
 				reader.ProcessVertices(
 					worldspawn,
 					(face, vertices) =>
@@ -31,7 +31,7 @@ namespace Tests
 				var face = pair.face;
 				var srcVerts = pair.vertices;
 				var triangleCount = BSPReader.GetFaceTriangleCount(srcVerts);
-				Span<Entry<VertexTL>> dstVerts = stackalloc Entry<VertexTL>[triangleCount * 3];
+				Span<Entry<VertexNTL>> dstVerts = stackalloc Entry<VertexNTL>[triangleCount * 3];
 				BSPReader.Triangulate(srcVerts, dstVerts);
 				Span<int> indices = stackalloc int[triangleCount * 3];
 				for (var i = 0; i < dstVerts.Length; i++)

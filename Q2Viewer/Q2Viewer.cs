@@ -16,6 +16,7 @@ namespace Q2Viewer
 		private DeviceBuffer _viewBuf;
 		private DeviceBuffer _projBuf;
 		private DebugPrimitives _debugPrimitives;
+		private LightmapRenderer _lightmapRenderer;
 		private BSPRenderer _renderer;
 		private readonly Options _options;
 
@@ -27,6 +28,7 @@ namespace Q2Viewer
 				WindowWidth = 800,
 				WindowHeight = 600,
 				IsResizable = true,
+				VSync = true,
 			},
 			new GraphicsDeviceOptions(
 				debug: false,
@@ -59,6 +61,7 @@ namespace Q2Viewer
 			_viewBuf = factory.CreateBuffer(new BufferDescription(64, BufferUsage.UniformBuffer | BufferUsage.Dynamic));
 			_projBuf = factory.CreateBuffer(new BufferDescription(64, BufferUsage.UniformBuffer | BufferUsage.Dynamic));
 			_debugPrimitives = new DebugPrimitives(Graphics, _viewBuf, _projBuf, _camera);
+			_lightmapRenderer = new LightmapRenderer(Graphics, _viewBuf, _projBuf, _camera);
 
 			var bspFileStream = File.OpenRead(_options.MapPath);
 			var bspFile = new BSPFile(bspFileStream, SharedArrayPoolAllocator.Instance);
@@ -68,7 +71,7 @@ namespace Q2Viewer
 
 		protected override void Update(TimeSpan frameTime)
 		{
-			_camera.Update((float)frameTime.Milliseconds / 1000.0f);
+			_camera.Update((float)frameTime.Ticks / TimeSpan.TicksPerSecond);
 			InputTracker.AfterUpdate();
 		}
 
@@ -82,7 +85,8 @@ namespace Q2Viewer
 			_cl.UpdateBuffer(_projBuf, 0, _camera.ProjectionMatrix);
 			_debugPrimitives.DrawGizmo(_cl);
 			_debugPrimitives.DrawCube(_cl, Vector3.Zero);
-			_renderer.DebugDraw(_cl, _debugPrimitives);
+			// _renderer.DebugDraw(_cl, _debugPrimitives);
+			_renderer.DrawLightmapped(_cl, _lightmapRenderer);
 			_cl.End();
 			Graphics.SubmitCommands(_cl);
 		}

@@ -15,11 +15,14 @@ namespace Q2Viewer
 		IsUnderwater = 0x80
 	}
 
-	public struct VertexTL
+	public struct VertexNTL
 	{
 		public Vector3 Position;
+		public Vector3 Normal;
 		public Vector2 UV;
 		public Vector2 LightmapUV;
+
+		public const int SizeInBytes = 12 * 2 + 8 * 2;
 	}
 
 	public struct VertexColor
