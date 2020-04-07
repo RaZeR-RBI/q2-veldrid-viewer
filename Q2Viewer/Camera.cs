@@ -20,7 +20,7 @@ namespace Q2Viewer
 
 		private Vector3 _position = new Vector3(0, 3, 0);
 		private Vector3 _lookDirection = new Vector3(0, -.3f, -1f);
-		private float _moveSpeed = 40.0f;
+		private float _moveSpeed = 100.0f;
 
 		private float _yaw;
 		private float _pitch;

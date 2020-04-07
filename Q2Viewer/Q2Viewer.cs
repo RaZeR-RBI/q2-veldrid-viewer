@@ -1,9 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Numerics;
 using Imagini;
 using Imagini.Veldrid;
+using SharpFileSystem;
+using SharpFileSystem.FileSystems;
 using Veldrid;
 
 namespace Q2Viewer
@@ -19,6 +22,7 @@ namespace Q2Viewer
 		private LightmapRenderer _lightmapRenderer;
 		private BSPRenderer _renderer;
 		private readonly Options _options;
+		private IFileSystem _fs;
 
 
 		// TODO: Read paths to PAKs to get textures from
@@ -41,6 +45,7 @@ namespace Q2Viewer
 		)
 		{
 			_options = options;
+			_fs = MountFilesystem(options);
 			_camera = new Camera(800, 600);
 			this.Resized += (s, e) =>
 			{
@@ -54,6 +59,16 @@ namespace Q2Viewer
 			_camera.Pitch = -MathF.PI / 8;
 		}
 
+		private IFileSystem MountFilesystem(Options options)
+		{
+			if (options.PakPaths == null || !options.PakPaths.Any())
+				return new MemoryFileSystem();
+			var paks = options.PakPaths
+				.Select(System.IO.File.OpenRead)
+				.Select(s => new QPakFS(s));
+			return new MergedFileSystem(paks);
+		}
+
 		protected override void Initialize()
 		{
 			var factory = Graphics.ResourceFactory;
@@ -63,10 +78,10 @@ namespace Q2Viewer
 			_debugPrimitives = new DebugPrimitives(Graphics, _viewBuf, _projBuf, _camera);
 			_lightmapRenderer = new LightmapRenderer(Graphics, _viewBuf, _projBuf, _camera);
 
-			var bspFileStream = File.OpenRead(_options.MapPath);
+			var bspFileStream = System.IO.File.OpenRead(_options.MapPath);
 			var bspFile = new BSPFile(bspFileStream, SharedArrayPoolAllocator.Instance);
 			bspFileStream.Close();
-			_renderer = new BSPRenderer(bspFile, SharedArrayPoolAllocator.Instance, Graphics);
+			_renderer = new BSPRenderer(bspFile, SharedArrayPoolAllocator.Instance, Graphics, _fs);
 		}
 
 		protected override void Update(TimeSpan frameTime)

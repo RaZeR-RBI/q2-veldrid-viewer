@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using SharpFileSystem;
 using Veldrid;
 
 namespace Q2Viewer
@@ -55,14 +56,14 @@ namespace Q2Viewer
 		private readonly TexturePool _texPool;
 		private readonly GraphicsDevice _gd;
 
-		public BSPRenderer(BSPFile file, IArrayAllocator allocator, GraphicsDevice gd)
+		public BSPRenderer(BSPFile file, IArrayAllocator allocator, GraphicsDevice gd, IFileSystem fs)
 		{
 			_file = file;
 			_reader = new BSPReader(file);
 			_allocator = allocator;
 			_gd = gd;
 
-			_texPool = new TexturePool(gd, file, allocator);
+			_texPool = new TexturePool(gd, file, fs, allocator);
 
 			foreach (var model in _reader.GetModels())
 			{
