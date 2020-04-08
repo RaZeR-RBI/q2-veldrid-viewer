@@ -58,6 +58,8 @@ void main()
 		private readonly DeviceBuffer _gizmoVertexBuffer;
 		private readonly DeviceBuffer _cubeVertexBuffer;
 		private readonly DeviceBuffer _cubeIndexBuffer;
+		private readonly DeviceBuffer _greenCube;
+		private readonly DeviceBuffer _redCube;
 
 		private static readonly VertexLayoutDescription s_colorVertexLayout = new VertexLayoutDescription(
 			new VertexElementDescription("Position", VertexElementSemantic.Position, VertexElementFormat.Float3),
@@ -147,6 +149,19 @@ void main()
 				sizeof(ushort) * (uint)cubeIndices.Length, BufferUsage.IndexBuffer
 			));
 			_device.UpdateBuffer(_cubeIndexBuffer, 0, cubeIndices);
+
+			_greenCube = CreateWireframeCube(factory, RgbaFloat.Green);
+			_redCube = CreateWireframeCube(factory, RgbaFloat.Red);
+		}
+
+		private DeviceBuffer CreateWireframeCube(ResourceFactory factory, RgbaFloat color)
+		{
+			var edgeVertices = GetWireframe(GetCubeVertices(color), GetCubeIndices());
+			var result = factory.CreateBuffer(new BufferDescription(
+				VertexColor.SizeInBytes * (uint)edgeVertices.Length, BufferUsage.VertexBuffer
+			));
+			_device.UpdateBuffer(result, 0, edgeVertices);
+			return result;
 		}
 
 		public void DrawLines(
@@ -205,9 +220,17 @@ void main()
 			DrawTriangles(cl, world, _cubeVertexBuffer, _cubeIndexBuffer, IndexFormat.UInt16, 36);
 		}
 
+		public void DrawAABB(CommandList cl, AABB box, bool red)
+		{
+			var center = (box.Max + box.Min) * 0.5f;
+			var scale = box.Max - box.Min + Vector3.One;
+			var world = Matrix4x4.CreateScale(scale) * Matrix4x4.CreateTranslation(center);
+			DrawLines(cl, world, red ? _redCube : _greenCube, 72);
+		}
+
 		private static VertexColor[] GetCubeVertices(RgbaFloat color)
 		{
-			VertexColor[] vertices = new VertexColor[]
+			return new VertexColor[]
 			{
                 // Top
                 new VertexColor(new Vector3(-0.5f, +0.5f, -0.5f), color),
@@ -240,8 +263,23 @@ void main()
 				new VertexColor(new Vector3(+0.5f, -0.5f, +0.5f), color),
 				new VertexColor(new Vector3(-0.5f, -0.5f, +0.5f), color),
 			};
+		}
 
-			return vertices;
+		private static VertexColor[] GetWireframe(VertexColor[] vertices, ushort[] indices)
+		{
+			var result = new VertexColor[indices.Length * 2];
+			for (var i = 0; i < indices.Length; i += 3)
+			{
+				result[i * 2] = vertices[indices[i]];
+				result[i * 2 + 1] = vertices[indices[i + 1]];
+
+				result[i * 2 + 2] = vertices[indices[i]];
+				result[i * 2 + 3] = vertices[indices[i + 2]];
+
+				result[i * 2 + 4] = vertices[indices[i + 1]];
+				result[i * 2 + 5] = vertices[indices[i + 2]];
+			}
+			return result;
 		}
 
 		private static ushort[] GetCubeIndices()

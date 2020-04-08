@@ -4,6 +4,7 @@ using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 using System.Text;
 using Veldrid;
 
@@ -11,6 +12,34 @@ namespace Q2Viewer
 {
 	public static class Util
 	{
+		// TODO [Optimize] Find a faster way to do frustum culling
+		[MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
+		public static bool CheckIfOutside(Matrix4x4 clipMatrix, AABB worldAABB)
+		{
+			// check if any vertex is inside the viewing frustum
+			Span<Vector4> vertices = stackalloc Vector4[8];
+			worldAABB.GetVertices(ref vertices);
+
+			var allToLeft = true;
+			var allToRight = true;
+			var allAbove = true;
+			var allBelow = true;
+			// TODO [Optimize] Check if this loop is being unrolled
+			for (var i = 0; i < 8; i++)
+			{
+				var pos = Vector4.Transform(vertices[i], clipMatrix);
+				if (allToLeft && pos.X > -pos.W)
+					allToLeft = false;
+				if (allToRight && pos.X < pos.W)
+					allToRight = false;
+				if (allAbove && pos.Y < pos.W)
+					allAbove = false;
+				if (allBelow && pos.Y > -pos.W)
+					allBelow = false;
+			}
+			return allToLeft || allToRight || allAbove || allBelow;
+		}
+
 		public static string ReadNullTerminated(ReadOnlySpan<byte> bytes, Encoding encoding = null)
 		{
 			if (encoding == null) encoding = Encoding.ASCII;

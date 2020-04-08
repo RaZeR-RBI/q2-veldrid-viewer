@@ -80,17 +80,18 @@ namespace Q2Viewer
 			var indexes = walTex.Mips[0].Pixels;
 			for (var i = 0; i < pixelCount; i++)
 				pixels[i] = QuakePalette.Colors[indexes[i]];
-			var texture = CreateTexture(walTex.Width, walTex.Height, pixels);
+			var texture = CreateTexture(walTex.Width, walTex.Height, pixels, path.ToString());
 			_allocator.Return(pixels);
 			return texture;
 		}
 
-		private Texture CreateTexture(int width, int height, ColorRGBA[] pixels)
+		private Texture CreateTexture(int width, int height, ColorRGBA[] pixels, string name = null)
 		{
 			var rf = _gd.ResourceFactory;
 			var texture = rf.CreateTexture(new TextureDescription(
 				(uint)width, (uint)height, 1, 1, 1, PixelFormat.R8_G8_B8_A8_UNorm, TextureUsage.Sampled | TextureUsage.GenerateMipmaps, TextureType.Texture2D
 			));
+			if (name != null) texture.Name = name;
 			var staging = rf.CreateTexture(new TextureDescription(
 				(uint)width, (uint)height, 1, 1, 1, PixelFormat.R8_G8_B8_A8_UNorm, TextureUsage.Staging, TextureType.Texture2D
 			));

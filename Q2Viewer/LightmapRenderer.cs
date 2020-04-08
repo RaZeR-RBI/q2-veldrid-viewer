@@ -102,14 +102,19 @@ namespace Q2Viewer
 			_textureSets.Add(texture, set);
 		}
 
-		public void Draw(CommandList cl, ModelRenderInfo mri, Matrix4x4 worldMatrix)
+		public int Draw(CommandList cl, ModelRenderInfo mri, Matrix4x4 worldMatrix)
 		{
 			cl.UpdateBuffer(_worldBuffer, 0, worldMatrix);
 			cl.SetPipeline(_noBlendPipeline);
+			var calls = 0;
+			var clipMatrix = Camera.ViewMatrix * Camera.ProjectionMatrix;
 			// TODO: Render alpha-blended faces separately
 			for (var i = 0; i < mri.FaceGroupsCount; i++)
 			{
 				ref var fg = ref mri.FaceGroups[i];
+				if (Util.CheckIfOutside(clipMatrix, fg.Bounds))
+					continue;
+
 				var diffuseTex = fg.Texture;
 				if (diffuseTex == null) continue;
 				if (!_textureSets.ContainsKey(diffuseTex))
@@ -123,7 +128,9 @@ namespace Q2Viewer
 				cl.SetGraphicsResourceSet(3, diffuseSet);
 				// TODO: Bind lightmap
 				cl.Draw(fg.Count);
+				calls++;
 			}
+			return calls;
 		}
 
 		private const string VertexCode = @"

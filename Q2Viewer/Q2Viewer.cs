@@ -98,11 +98,11 @@ namespace Q2Viewer
 			_cl.ClearDepthStencil(1.0f);
 			_cl.UpdateBuffer(_viewBuf, 0, _camera.ViewMatrix);
 			_cl.UpdateBuffer(_projBuf, 0, _camera.ProjectionMatrix);
-			_debugPrimitives.DrawGizmo(_cl);
-			_debugPrimitives.DrawCube(_cl, Vector3.Zero);
-			// _renderer.DebugDraw(_cl, _debugPrimitives);
-			_renderer.DrawLightmapped(_cl, _lightmapRenderer);
+			// _debugPrimitives.DrawGizmo(_cl);
+			// _debugPrimitives.DrawCube(_cl, Vector3.Zero);
+			var calls = _renderer.DrawLightmapped(_cl, _lightmapRenderer);
 			_cl.End();
+			Window.Title = $"Q2 Viewer (DC: {calls})";
 			Graphics.SubmitCommands(_cl);
 		}
 

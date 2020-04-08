@@ -14,6 +14,7 @@ namespace Q2Viewer
 		public Texture Lightmap;
 		public DeviceBuffer Buffer;
 		public uint Count;
+		public AABB Bounds;
 
 		public void Dispose()
 		{
@@ -80,7 +81,7 @@ namespace Q2Viewer
 				}
 				// we got an invisible model - a trigger or something
 				var wf = BuildDebugEdgeBuffer(gd,
-				model, RgbaFloat.Red, out uint edgeCount);
+				model, RgbaFloat.Blue, out uint edgeCount);
 				_wireframes.Add((wf, edgeCount));
 			}
 		}
@@ -140,6 +141,17 @@ namespace Q2Viewer
 						offset++;
 					}
 				});
+				// calculate AABB
+				var min = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue);
+				var max = new Vector3(float.MinValue, float.MinValue, float.MinValue);
+				for (var i = 0; i < count; i++)
+				{
+					ref var point = ref vertices[i].Position;
+					min = Vector3.Min(point, min);
+					max = Vector3.Max(point, max);
+				}
+				tfg.Bounds = new AABB(min, max);
+
 				var buffer = _gd.ResourceFactory.CreateBuffer(
 					new BufferDescription(count * VertexNTL.SizeInBytes, BufferUsage.VertexBuffer)
 				);
@@ -257,10 +269,23 @@ namespace Q2Viewer
 				helper.DrawLines(cl, Matrix4x4.Identity, vb, count);
 		}
 
-		public void DrawLightmapped(CommandList cl, LightmapRenderer renderer)
+		public void DebugDrawFrustumCheck(CommandList cl, DebugPrimitives helper)
 		{
+			var matVp = helper.Camera.ViewMatrix * helper.Camera.ProjectionMatrix;
 			foreach (var mri in _models)
-				renderer.Draw(cl, mri, Matrix4x4.Identity);
+				for (var i = 0; i < mri.FaceGroupsCount; i++)
+				{
+					var aabb = mri.FaceGroups[i].Bounds;
+					helper.DrawAABB(cl, aabb, Util.CheckIfOutside(matVp, aabb));
+				}
+		}
+
+		public int DrawLightmapped(CommandList cl, LightmapRenderer renderer)
+		{
+			var calls = 0;
+			foreach (var mri in _models)
+				calls += renderer.Draw(cl, mri, Matrix4x4.Identity);
+			return calls;
 		}
 	}
 }
