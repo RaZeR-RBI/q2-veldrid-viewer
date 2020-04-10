@@ -101,6 +101,7 @@ namespace Q2Viewer
 			// _debugPrimitives.DrawGizmo(_cl);
 			// _debugPrimitives.DrawCube(_cl, Vector3.Zero);
 			var calls = _renderer.DrawLightmapped(_cl, _lightmapRenderer);
+			// _renderer.DrawDebugModels(_cl, _debugPrimitives);
 			_cl.End();
 			Window.Title = $"Q2 Viewer (DC: {calls})";
 			Graphics.SubmitCommands(_cl);

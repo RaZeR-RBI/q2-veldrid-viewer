@@ -25,6 +25,7 @@ namespace Q2Viewer
 
 		private readonly Pipeline _noBlendPipeline;
 		private readonly Sampler _diffuseSampler;
+		private readonly Sampler _lightmapSampler;
 
 		private readonly Texture _whiteTexture;
 		private readonly Dictionary<Texture, ResourceSet> _textureSets = new Dictionary<Texture, ResourceSet>();
@@ -106,6 +107,19 @@ namespace Q2Viewer
 				uint.MaxValue,
 				0,
 				SamplerBorderColor.OpaqueBlack
+			));
+
+			_lightmapSampler = factory.CreateSampler(new SamplerDescription(
+				SamplerAddressMode.Border,
+				SamplerAddressMode.Border,
+				SamplerAddressMode.Border,
+				SamplerFilter.MinPoint_MagPoint_MipPoint, // TODO: Linear
+				null,
+				0,
+				0,
+				uint.MaxValue,
+				0,
+				SamplerBorderColor.OpaqueWhite
 			));
 		}
 
@@ -202,9 +216,11 @@ layout(set = 3, binding = 1) uniform sampler LightmapSampler;
 void main()
 {
 	vec4 color = texture(sampler2D(DiffuseTexture, DiffuseSampler), fsin_texCoords);
-	vec4 lm = texture(sampler2D(LightmapTexture, LightmapSampler), fsin_lmCoords);
+	vec4 lm = texture(sampler2D(LightmapTexture, LightmapSampler), fsin_lmCoords) * 1.3;
+	vec4 gamma = vec4(1.0 / 2.2);
+	fsout_color = pow(color * lm, gamma);
     // fsout_color = color * (lm * 2.0);
-	fsout_color = lm * 2.0;
+	// fsout_color = lm * 2;
 	// fsout_color = vec4(fsin_lmCoords, 0.0, 0.0);
 }";
 	}

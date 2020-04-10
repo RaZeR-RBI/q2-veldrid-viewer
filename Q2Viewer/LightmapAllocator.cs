@@ -9,8 +9,8 @@ namespace Q2Viewer
 {
 	public class LightmapAllocator
 	{
-		public const uint BlockSize = 128;
-		private const uint c_padding = 1;
+		public const uint BlockSize = 4096; // TODO: 4096
+		private const uint c_padding = 0;
 		private const int c_lightmapScale = 16;
 		private const float c_coordScale = BlockSize * c_lightmapScale;
 
@@ -63,8 +63,11 @@ namespace Q2Viewer
 		private readonly List<(LightmapAllocData data, Texture target)> _lightmaps =
 			new List<(LightmapAllocData data, Texture texture)>();
 
-		public LightmapAllocator(GraphicsDevice gd, IArrayAllocator allocator) =>
+		public LightmapAllocator(GraphicsDevice gd, IArrayAllocator allocator)
+		{
 			(_gd, _allocator) = (gd, allocator);
+			CreateNewBlock();
+		}
 
 		private bool AllocateInCurrentBlock(uint uMax, uint vMax, out uint u, out uint v, out Texture staging)
 		{
@@ -126,15 +129,16 @@ namespace Q2Viewer
 			if (AllocateInCurrentBlock((uint)extents.X, (uint)extents.Y, out u, out v, out staging))
 				goto process;
 
-			CreateNewBlock();
-			if (AllocateInCurrentBlock((uint)extents.X, (uint)extents.Y, out u, out v, out staging))
-				goto process;
+			// we don't do that because the renderer doesn't switch between lightmaps properly right now
+			// CreateNewBlock();
+			// if (AllocateInCurrentBlock((uint)extents.X, (uint)extents.Y, out u, out v, out staging))
+			// goto process;
 
 			throw new ArgumentOutOfRangeException("Unable to allocate lightmap block");
 
 		process:
 			position = new Vector2((float)u / BlockSize, (float)v / BlockSize);
-			scale = new Vector2((float)extents.X / c_coordScale, (float)extents.Y / c_coordScale);
+			scale = new Vector2((float)(extents.X + 16) / c_coordScale, (float)(extents.Y + 16) / c_coordScale);
 
 			texture = _lightmaps.Last().target;
 			var texSize = LightmapAllocData.GetLightmapSize(extents);
@@ -160,10 +164,10 @@ namespace Q2Viewer
 				}
 			}
 
-			Debug.Assert(position.X < 1f);
-			Debug.Assert(position.X > 0f);
-			Debug.Assert(position.Y < 1f);
-			Debug.Assert(position.Y > 0f);
+			// Debug.Assert(position.X <= 1f);
+			// Debug.Assert(position.X >= 0f);
+			// Debug.Assert(position.Y <= 1f);
+			// Debug.Assert(position.Y >= 0f);
 
 		}
 

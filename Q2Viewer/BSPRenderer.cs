@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Numerics;
 using SharpFileSystem;
@@ -146,15 +147,15 @@ namespace Q2Viewer
 					{
 						_lm.AllocateBlock(_file.Lighting.RawData, f.LightOffset, tExt,
 							out Vector2 lmPos, out Vector2 lmSize, out Texture lmTexture);
-						for (var k = 0; k < vertices.Length; k++)
+						Debug.Assert(vertices.Select(v => v.LightmapUV).Distinct().Count() > 1);
+						for (var k = offset - vt.Length; k < offset; k++)
 						{
-							// TODO FIXME: Coordinates seem to be wrong
 							ref var v = ref vertices[k].LightmapUV;
-							v *= lmSize;
-							v += lmPos;
-							// v *= new Vector2(-1, -1f);
-							// v += new Vector2(1, 1);
+							var normalizedUV = v;
+							v.X = lmPos.X + normalizedUV.X * lmSize.X;
+							v.Y = lmPos.Y + normalizedUV.Y * lmSize.Y;
 						}
+						// TODO: Check if it's a new lightmap and split into new face group if so
 						tfg.Lightmap = lmTexture;
 					}
 				});
