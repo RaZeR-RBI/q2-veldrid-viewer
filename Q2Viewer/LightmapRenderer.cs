@@ -24,7 +24,9 @@ namespace Q2Viewer
 		private readonly ResourceLayout _lightmapLayout;
 
 		private readonly Pipeline _noBlendPipeline;
+		private readonly Sampler _diffuseSampler;
 
+		private readonly Texture _whiteTexture;
 		private readonly Dictionary<Texture, ResourceSet> _textureSets = new Dictionary<Texture, ResourceSet>();
 
 		public Camera Camera { get; set; }
@@ -38,6 +40,8 @@ namespace Q2Viewer
 			_device = graphics;
 			Camera = camera;
 			var factory = _device.ResourceFactory;
+
+			_whiteTexture = TexturePool.CreateWhiteTexture(_device);
 
 			_worldBuffer = factory.CreateBuffer(new BufferDescription(64, BufferUsage.UniformBuffer | BufferUsage.Dynamic));
 			_device.UpdateBuffer(_worldBuffer, 0, Matrix4x4.Identity);
@@ -90,6 +94,19 @@ namespace Q2Viewer
 				worldLayout,
 				_worldBuffer
 			));
+
+			_diffuseSampler = factory.CreateSampler(new SamplerDescription(
+				SamplerAddressMode.Wrap,
+				SamplerAddressMode.Wrap,
+				SamplerAddressMode.Wrap,
+				SamplerFilter.MinLinear_MagPoint_MipLinear,
+				null,
+				0,
+				0,
+				uint.MaxValue,
+				0,
+				SamplerBorderColor.OpaqueBlack
+			));
 		}
 
 		private void CreateTextureSet(Texture texture, Sampler sampler, ResourceLayout layout)
@@ -118,14 +135,21 @@ namespace Q2Viewer
 				var diffuseTex = fg.Texture;
 				if (diffuseTex == null) continue;
 				if (!_textureSets.ContainsKey(diffuseTex))
-					CreateTextureSet(diffuseTex, _device.PointSampler, _diffuseLayout);
+					CreateTextureSet(diffuseTex, _diffuseSampler, _diffuseLayout);
 				var diffuseSet = _textureSets[diffuseTex];
+
+				var lightmapTex = fg.Lightmap ?? _whiteTexture;
+				if (!_textureSets.ContainsKey(lightmapTex))
+					// TODO: Linear filtering
+					CreateTextureSet(lightmapTex, _device.PointSampler, _lightmapLayout);
+				var lightmapSet = _textureSets[lightmapTex];
+
 
 				cl.SetVertexBuffer(0, fg.Buffer);
 				cl.SetGraphicsResourceSet(0, _projViewSet);
 				cl.SetGraphicsResourceSet(1, _worldBufferSet);
 				cl.SetGraphicsResourceSet(2, diffuseSet);
-				cl.SetGraphicsResourceSet(3, diffuseSet);
+				cl.SetGraphicsResourceSet(3, lightmapSet);
 				// TODO: Bind lightmap
 				cl.Draw(fg.Count);
 				calls++;
@@ -161,6 +185,7 @@ void main()
     vec4 clipPosition = Projection * viewPosition;
     gl_Position = clipPosition;
     fsin_texCoords = TexCoords;
+	fsin_lmCoords = LMCoords;
 }";
 
 		private const string FragmentCode = @"
@@ -176,7 +201,11 @@ layout(set = 3, binding = 1) uniform sampler LightmapSampler;
 
 void main()
 {
-    fsout_color =  texture(sampler2D(DiffuseTexture, DiffuseSampler), fsin_texCoords);
+	vec4 color = texture(sampler2D(DiffuseTexture, DiffuseSampler), fsin_texCoords);
+	vec4 lm = texture(sampler2D(LightmapTexture, LightmapSampler), fsin_lmCoords);
+    // fsout_color = color * (lm * 2.0);
+	fsout_color = lm * 2.0;
+	// fsout_color = vec4(fsin_lmCoords, 0.0, 0.0);
 }";
 	}
 }

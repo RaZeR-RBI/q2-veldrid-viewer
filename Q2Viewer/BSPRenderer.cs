@@ -48,6 +48,7 @@ namespace Q2Viewer
 		private readonly BSPReader _reader;
 		private readonly BSPFile _file;
 		private readonly IArrayAllocator _allocator;
+		private readonly LightmapAllocator _lm;
 
 		private readonly List<(DeviceBuffer, uint)> _wireframes = new List<(DeviceBuffer, uint)>();
 		private readonly List<(DeviceBuffer, uint)> _debugModels =
@@ -63,6 +64,7 @@ namespace Q2Viewer
 			_reader = new BSPReader(file);
 			_allocator = allocator;
 			_gd = gd;
+			_lm = new LightmapAllocator(_gd, _allocator);
 
 			_texPool = new TexturePool(gd, file, fs, allocator);
 
@@ -126,7 +128,7 @@ namespace Q2Viewer
 
 				var vertices = _allocator.Rent<VertexNTL>((int)count);
 				var offset = 0;
-				_reader.ProcessVertices(group, (f, ev) =>
+				_reader.ProcessVertices(group, (f, ev, tMin, tExt) =>
 				{
 					var triangleCount = BSPReader.GetFaceTriangleCount(ev);
 					Span<Entry<VertexNTL>> vt = stackalloc Entry<VertexNTL>[triangleCount * 3];
@@ -139,6 +141,21 @@ namespace Q2Viewer
 						// TODO: Adjust the lightmap coordinates
 						vertices[offset] = vertex;
 						offset++;
+					}
+					if (LightmapAllocator.ShouldHaveLightmap(_file.TextureInfos.Data[f.TextureInfoId]))
+					{
+						_lm.AllocateBlock(_file.Lighting.RawData, f.LightOffset, tExt,
+							out Vector2 lmPos, out Vector2 lmSize, out Texture lmTexture);
+						for (var k = 0; k < vertices.Length; k++)
+						{
+							// TODO FIXME: Coordinates seem to be wrong
+							ref var v = ref vertices[k].LightmapUV;
+							v *= lmSize;
+							v += lmPos;
+							// v *= new Vector2(-1, -1f);
+							// v += new Vector2(1, 1);
+						}
+						tfg.Lightmap = lmTexture;
 					}
 				});
 				// calculate AABB
@@ -160,6 +177,7 @@ namespace Q2Viewer
 				mri.FaceGroups[tfgId] = tfg;
 				tfgId++;
 			}
+			_lm.CompileLightmaps();
 			return mri;
 		}
 
@@ -219,7 +237,7 @@ namespace Q2Viewer
 			var memory = new Memory<VertexColor>(vertices, 0, (int)count);
 
 			var offset = 0;
-			_reader.ProcessVertices(model, (f, v) =>
+			_reader.ProcessVertices(model, (f, v, _, __) =>
 			{
 				ref var texInfo = ref _file.TextureInfos.Data[f.TextureInfoId];
 				// skip triggers, clips and other invisible faces

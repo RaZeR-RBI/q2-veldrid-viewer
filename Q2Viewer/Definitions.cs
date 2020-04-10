@@ -57,4 +57,41 @@ namespace Q2Viewer
 			vertices[7] = new Vector4(Max.X, Max.Y, Min.Z, 1);
 		}
 	}
+
+	public struct Vector2i
+	{
+		public int X;
+		public int Y;
+
+		public Vector2i(int x, int y) => (X, Y) = (x, y);
+
+		public override string ToString() => $"{{ {X}, {Y} }}";
+
+		public static Vector2i operator +(Vector2i vector) => vector;
+		public static Vector2i operator -(Vector2i vector) => new Vector2i(-vector.X, -vector.Y);
+
+		public static Vector2i operator +(Vector2i a, Vector2i b) =>
+			new Vector2i(a.X + b.X, a.Y + b.Y);
+
+		public static Vector2i operator -(Vector2i a, Vector2i b) =>
+			new Vector2i(a.X - b.X, a.Y - b.Y);
+
+		public static Vector2i operator *(Vector2i v, int t) =>
+			new Vector2i(v.X * t, v.Y * t);
+
+		public static Vector2i operator /(Vector2i v, int t) =>
+			new Vector2i(v.X / t, v.Y / t);
+
+		public static Vector2 operator /(Vector2i v, float t) =>
+			new Vector2((float)v.X / t, (float)v.Y / t);
+
+		public static Vector2i Min(Vector2i a, Vector2i b) =>
+			new Vector2i(Math.Min(a.X, b.X), Math.Min(a.Y, b.Y));
+
+		public static Vector2i Max(Vector2i a, Vector2i b) =>
+			new Vector2i(Math.Max(a.X, b.X), Math.Max(a.Y, b.Y));
+
+		public static explicit operator Vector2(Vector2i v) =>
+			new Vector2((float)v.X, (float)v.Y);
+	}
 }

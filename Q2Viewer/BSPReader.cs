@@ -1,11 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Numerics;
 
 namespace Q2Viewer
 {
-	public delegate void FaceVisitorCallback(LFace data, Span<Entry<VertexNTL>> vertices);
+	public delegate void FaceVisitorCallback(LFace data, Span<Entry<VertexNTL>> vertices, Vector2i textureMins, Vector2i extents);
 
 	public struct Entry<T>
 	{
@@ -38,6 +39,8 @@ namespace Q2Viewer
 					stackalloc Entry<VertexNTL>[face.EdgeCount];
 
 				var k = 0;
+				var uvMin = new Vector2(float.MaxValue, float.MaxValue);
+				var uvMax = new Vector2(float.MinValue, float.MinValue);
 				for (var j = face.FirstEdgeId; j < face.FirstEdgeId + face.EdgeCount; j++)
 				{
 					var id = File.SurfaceEdges.Data[j].Value;
@@ -58,14 +61,31 @@ namespace Q2Viewer
 					// texture coordinates - need to divide by texture width and height
 					vertex.UV.X = Vector3.Dot(vertex.Position, s) + tex.S.W;
 					vertex.UV.Y = Vector3.Dot(vertex.Position, t) + tex.T.W;
+					// face extents
+					uvMin = Vector2.Min(uvMin, vertex.UV);
+					uvMax = Vector2.Max(uvMax, vertex.UV);
 					// lightmap coordinates - need to be adjusted to lightmap atlas
-					vertex.LightmapUV = vertex.UV / LightmapSizeF;
+					vertex.LightmapUV = vertex.UV;
 
 					vertices[k].Index = vertexId;
 					vertices[k].Value = vertex;
 					k++;
 				}
-				callback(face, vertices);
+				var bmin = new Vector2i((int)MathF.Floor(uvMin.X / 16), (int)MathF.Floor(uvMin.Y / 16));
+				var bmax = new Vector2i((int)MathF.Ceiling(uvMax.X / 16), (int)MathF.Ceiling(uvMax.Y / 16));
+				var textureMins = bmin * 16;
+				var extents = (bmax - bmin) * 16;
+
+				// Debug.Assert(extents.X > 0);
+				// Debug.Assert(extents.Y > 0);
+
+				for (var l = 0; l < vertices.Length; l++)
+				{
+					ref var v = ref vertices[l].Value;
+					v.LightmapUV -= (Vector2)textureMins;
+					v.LightmapUV /= (Vector2)extents;
+				}
+				callback(face, vertices, textureMins, extents);
 			}
 		}
 
