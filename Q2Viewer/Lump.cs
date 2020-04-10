@@ -49,9 +49,13 @@ namespace Q2Viewer
 			Length = length;
 			var ms = new MemoryStream(_rawData);
 			Span<byte> buffer = stackalloc byte[4096];
+			var total = 0;
 			while (true)
 			{
 				var bytesRead = stream.Read(buffer);
+				total += bytesRead;
+				if (total > length)
+					bytesRead -= (total - length);
 				ms.Write(buffer.Slice(0, Math.Min(bytesRead, length)));
 				if (bytesRead < 4096) break;
 			}
