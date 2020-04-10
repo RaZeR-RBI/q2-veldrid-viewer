@@ -19,7 +19,7 @@ namespace Q2Viewer
 		private DeviceBuffer _viewBuf;
 		private DeviceBuffer _projBuf;
 		private DebugPrimitives _debugPrimitives;
-		private LightmapRenderer _lightmapRenderer;
+		private ModelRenderer _lightmapRenderer;
 		private BSPRenderer _renderer;
 		private readonly Options _options;
 		private IFileSystem _fs;
@@ -76,7 +76,7 @@ namespace Q2Viewer
 			_viewBuf = factory.CreateBuffer(new BufferDescription(64, BufferUsage.UniformBuffer | BufferUsage.Dynamic));
 			_projBuf = factory.CreateBuffer(new BufferDescription(64, BufferUsage.UniformBuffer | BufferUsage.Dynamic));
 			_debugPrimitives = new DebugPrimitives(Graphics, _viewBuf, _projBuf, _camera);
-			_lightmapRenderer = new LightmapRenderer(Graphics, _viewBuf, _projBuf, _camera);
+			_lightmapRenderer = new ModelRenderer(Graphics, _viewBuf, _projBuf, _camera);
 
 			var bspFileStream = System.IO.File.OpenRead(_options.MapPath);
 			var bspFile = new BSPFile(bspFileStream, SharedArrayPoolAllocator.Instance);
@@ -100,7 +100,7 @@ namespace Q2Viewer
 			_cl.UpdateBuffer(_projBuf, 0, _camera.ProjectionMatrix);
 			// _debugPrimitives.DrawGizmo(_cl);
 			// _debugPrimitives.DrawCube(_cl, Vector3.Zero);
-			var calls = _renderer.DrawLightmapped(_cl, _lightmapRenderer);
+			var calls = _renderer.Draw(_cl, _lightmapRenderer);
 			// _renderer.DrawDebugModels(_cl, _debugPrimitives);
 			_cl.End();
 			Window.Title = $"Q2 Viewer (DC: {calls})";

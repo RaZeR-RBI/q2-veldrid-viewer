@@ -9,10 +9,13 @@ namespace Q2Viewer
 {
 	public class LightmapAllocator
 	{
-		public const uint BlockSize = 4096; // TODO: 4096
+		public const uint BlockSize = 4096;
 		private const uint c_padding = 0;
 		private const int c_lightmapScale = 16;
 		private const float c_coordScale = BlockSize * c_lightmapScale;
+		private const float c_halfPixel = 0.5f / (float)BlockSize;
+		private static readonly Vector2 s_halfPixelVec = new Vector2(c_halfPixel, c_halfPixel);
+		private static readonly Vector2 s_pixelVec = new Vector2(2f * c_halfPixel, 2f * c_halfPixel);
 
 		private struct LightmapAllocData
 		{
@@ -139,6 +142,9 @@ namespace Q2Viewer
 		process:
 			position = new Vector2((float)u / BlockSize, (float)v / BlockSize);
 			scale = new Vector2((float)(extents.X + 16) / c_coordScale, (float)(extents.Y + 16) / c_coordScale);
+			// inset the coordinates for half of a pixel to avoid edge artifacts
+			position += s_halfPixelVec;
+			scale -= s_pixelVec;
 
 			texture = _lightmaps.Last().target;
 			var texSize = LightmapAllocData.GetLightmapSize(extents);
@@ -163,12 +169,6 @@ namespace Q2Viewer
 					0, 0);
 				}
 			}
-
-			// Debug.Assert(position.X <= 1f);
-			// Debug.Assert(position.X >= 0f);
-			// Debug.Assert(position.Y <= 1f);
-			// Debug.Assert(position.Y >= 0f);
-
 		}
 
 		public void CompileLightmaps()

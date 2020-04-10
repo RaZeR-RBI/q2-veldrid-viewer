@@ -299,7 +299,7 @@ namespace Q2Viewer
 				}
 		}
 
-		public int DrawLightmapped(CommandList cl, LightmapRenderer renderer)
+		public int Draw(CommandList cl, ModelRenderer renderer)
 		{
 			var calls = 0;
 			foreach (var mri in _models)
