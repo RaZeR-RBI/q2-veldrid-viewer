@@ -51,10 +51,7 @@ namespace Q2Viewer
 		}
 
 		public static Texture CreateWhiteTexture(GraphicsDevice device) =>
-			TexturePool.CreateTexture(device, 2, 2, new ColorRGBA[] {
-				new ColorRGBA(255, 255, 255),
-				new ColorRGBA(255, 255, 255),
-				new ColorRGBA(255, 255, 255),
+			TexturePool.CreateTexture(device, 1, 1, new ColorRGBA[] {
 				new ColorRGBA(255, 255, 255),
 			}, "_FALLBACK_WHITE");
 
@@ -109,7 +106,7 @@ namespace Q2Viewer
 
 			var rf = device.ResourceFactory;
 			var texture = rf.CreateTexture(new TextureDescription(
-				(uint)width, (uint)height, 1, 4, 1, PixelFormat.R8_G8_B8_A8_UNorm, usage, TextureType.Texture2D
+				(uint)width, (uint)height, 1, genMipmaps ? 4u : 1u, 1, PixelFormat.R8_G8_B8_A8_UNorm, usage, TextureType.Texture2D
 			));
 			if (name != null) texture.Name = name;
 			device.UpdateTexture<ColorRGBA>(texture, pixels, 0, 0, 0, (uint)width, (uint)height, 1, 0, 0);
