@@ -108,7 +108,7 @@ namespace Q2Viewer
 				{
 					ref var face = ref _file.Faces.Data[i];
 					ref var tex = ref _file.TextureInfos.Data[face.TextureInfoId];
-					return (tex.TextureName, tex.Flags);
+					return (TextureName: tex.TextureName.ToLowerInvariant(), tex.Flags);
 				});
 
 			// TODO: Build lightmaps
@@ -129,8 +129,9 @@ namespace Q2Viewer
 
 				var vertices = _allocator.Rent<VertexNTL>((int)count);
 				var offset = 0;
-				_reader.ProcessVertices(group, (f, ev, tMin, tExt) =>
+				_reader.ProcessVertices(group, (faceIndex, f, ev, tMin, tExt) =>
 				{
+
 					var triangleCount = BSPReader.GetFaceTriangleCount(ev);
 					Span<Entry<VertexNTL>> vt = stackalloc Entry<VertexNTL>[triangleCount * 3];
 					BSPReader.Triangulate(ev, vt);
@@ -143,7 +144,10 @@ namespace Q2Viewer
 						vertices[offset] = vertex;
 						offset++;
 					}
-					if (LightmapAllocator.ShouldHaveLightmap(_file.TextureInfos.Data[f.TextureInfoId]))
+					ref var texInfo = ref _file.TextureInfos.Data[f.TextureInfoId];
+					var hasLightmap = LightmapAllocator.ShouldHaveLightmap(texInfo);
+
+					if (hasLightmap)
 					{
 						_lm.AllocateBlock(_file.Lighting.RawData, f.LightOffset, tExt,
 							out Vector2 lmPos, out Vector2 lmSize, out Texture lmTexture);
@@ -158,6 +162,7 @@ namespace Q2Viewer
 						// TODO: Check if it's a new lightmap and split into new face group if so
 						tfg.Lightmap = lmTexture;
 					}
+					else tfg.Lightmap = null;
 				});
 				// calculate AABB
 				var min = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue);
@@ -238,7 +243,7 @@ namespace Q2Viewer
 			var memory = new Memory<VertexColor>(vertices, 0, (int)count);
 
 			var offset = 0;
-			_reader.ProcessVertices(model, (f, v, _, __) =>
+			_reader.ProcessVertices(model, (_, f, v, __, ___) =>
 			{
 				ref var texInfo = ref _file.TextureInfos.Data[f.TextureInfoId];
 				// skip triggers, clips and other invisible faces

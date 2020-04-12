@@ -23,7 +23,7 @@ namespace Tests
 				var data = new List<(LFace face, Entry<VertexNTL>[] vertices)>();
 				reader.ProcessVertices(
 					worldspawn,
-					(face, vertices, _, __) =>
+					(_, face, vertices, __, ___) =>
 						data.Add((face, vertices.ToArray())));
 				data.Count.Should().Be(16);
 

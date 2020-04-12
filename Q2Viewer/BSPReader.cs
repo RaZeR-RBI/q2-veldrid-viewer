@@ -6,7 +6,7 @@ using System.Numerics;
 
 namespace Q2Viewer
 {
-	public delegate void FaceVisitorCallback(LFace data, Span<Entry<VertexNTL>> vertices, Vector2i textureMins, Vector2i extents);
+	public delegate void FaceVisitorCallback(int faceIndex, LFace data, Span<Entry<VertexNTL>> vertices, Vector2i textureMins, Vector2i extents);
 
 	public struct Entry<T>
 	{
@@ -85,8 +85,26 @@ namespace Q2Viewer
 					v.LightmapUV -= (Vector2)textureMins;
 					v.LightmapUV /= (Vector2)extents;
 				}
-				callback(face, vertices, textureMins, extents);
+				callback(i, face, vertices, textureMins, extents);
 			}
+		}
+
+		public bool FindContainingLeaf(int faceIndex, out LLeaf leaf)
+		{
+			Debug.Assert(faceIndex >= 0);
+			Debug.Assert(faceIndex < File.Faces.Length);
+			for (var i = 0; i < File.Leaves.Length; i++)
+			{
+				var cur = File.Leaves.Data[i];
+				for (var j = cur.FirstLeafFace; j < cur.FirstLeafFace + cur.NumLeafFaces; j++)
+					if (File.LeafFaces.Data[j].Value == faceIndex)
+					{
+						leaf = cur;
+						return true;
+					}
+			}
+			leaf = new LLeaf();
+			return false;
 		}
 
 		public static int GetFaceVertexCount(LFace face) =>

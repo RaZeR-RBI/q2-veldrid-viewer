@@ -32,13 +32,12 @@ namespace Q2Viewer
 		private readonly IArrayAllocator _allocator;
 		private readonly IFileSystem _fs;
 
-		public readonly Texture WhiteTexture;
-
 		public TexturePool(GraphicsDevice gd, BSPFile file, IFileSystem fs, IArrayAllocator allocator)
 		{
 			(_gd, _bsp, _allocator, _fs) = (gd, file, allocator, fs);
 			var textureNames = file.TextureInfos.Data
-				.Select(t => t.TextureName)
+				.Where(t => t.TextureName != null)
+				.Select(t => t.TextureName?.ToLowerInvariant())
 				.Distinct();
 
 			foreach (var name in textureNames)
@@ -52,7 +51,10 @@ namespace Q2Viewer
 		}
 
 		public static Texture CreateWhiteTexture(GraphicsDevice device) =>
-			TexturePool.CreateTexture(device, 1, 1, new ColorRGBA[] {
+			TexturePool.CreateTexture(device, 2, 2, new ColorRGBA[] {
+				new ColorRGBA(255, 255, 255),
+				new ColorRGBA(255, 255, 255),
+				new ColorRGBA(255, 255, 255),
 				new ColorRGBA(255, 255, 255),
 			}, "_FALLBACK_WHITE");
 
@@ -101,12 +103,18 @@ namespace Q2Viewer
 
 		public static Texture CreateTexture(GraphicsDevice device, int width, int height, ColorRGBA[] pixels, string name = null)
 		{
+			var genMipmaps = (width > 1 && height > 1);
+			var usage = TextureUsage.Sampled;
+			if (genMipmaps) usage |= TextureUsage.GenerateMipmaps;
+
 			var rf = device.ResourceFactory;
 			var texture = rf.CreateTexture(new TextureDescription(
-				(uint)width, (uint)height, 1, 4, 1, PixelFormat.R8_G8_B8_A8_UNorm, TextureUsage.Sampled | TextureUsage.GenerateMipmaps, TextureType.Texture2D
+				(uint)width, (uint)height, 1, 4, 1, PixelFormat.R8_G8_B8_A8_UNorm, usage, TextureType.Texture2D
 			));
 			if (name != null) texture.Name = name;
 			device.UpdateTexture<ColorRGBA>(texture, pixels, 0, 0, 0, (uint)width, (uint)height, 1, 0, 0);
+
+			if (!genMipmaps) return texture;
 
 			var cl = rf.CreateCommandList();
 			cl.Begin();

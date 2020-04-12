@@ -240,6 +240,11 @@ namespace Q2Viewer
 			FirstLeafBrush = ReadUInt16LittleEndian(bytes.Slice(24));
 			NumLeafBrushes = ReadUInt16LittleEndian(bytes.Slice(26));
 		}
+
+		public bool IsLiquid() =>
+			Contents.HasFlag(ContentFlags.Water) ||
+			Contents.HasFlag(ContentFlags.Lava) ||
+			Contents.HasFlag(ContentFlags.Slime);
 	}
 
 	public struct LNode : ILumpData
