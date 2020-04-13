@@ -153,6 +153,12 @@ namespace Q2Viewer
 		public byte LightmapStyle3;
 		public byte LightmapStyle4;
 
+		public int LightmapStyles =>
+			(LightmapStyle1) +
+			(LightmapStyle2 << 8) +
+			(LightmapStyle3 << 16) +
+			(LightmapStyle4 << 24);
+
 		public int LightOffset;
 
 		public int Size => 2 * 2 + 4 + 2 * 2 + 4 + 4;

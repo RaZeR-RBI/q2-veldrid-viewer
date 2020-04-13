@@ -1,6 +1,8 @@
+using System;
 using System.Collections.Generic;
 using System.Numerics;
 using System.Text;
+using System.Linq;
 using Veldrid;
 using Veldrid.SPIRV;
 
@@ -19,7 +21,8 @@ namespace Q2Viewer
 
 		private readonly DeviceBuffer _worldBuffer;
 		private readonly ResourceSet _projViewSet;
-		private readonly ResourceSet _worldBufferSet;
+		private readonly ResourceSet _worldParamSet;
+		private readonly DeviceBuffer _lightStyleBuffer;
 		private readonly DeviceBuffer _alphaValueBuffer;
 		private readonly ResourceSet _worldAlphaSet;
 		private readonly ResourceLayout _diffuseLayout;
@@ -35,6 +38,25 @@ namespace Q2Viewer
 
 		private static float[] s_transparency33 = new[] { 1f, 1f, 1f, 0.33f };
 		private static float[] s_transparency66 = new[] { 1f, 1f, 1f, 0.66f };
+		private const float s_lightStyleScale = (float)'m' - (float)'a';
+		private const int c_maxLightStyles = 256;
+		private static float[][] s_lightStyles = new[] {
+			"m",
+			"abcdefghijklmnopqrstuvwxyzyxwvutsrqponmlkjihgfedcba",
+			"mmmmmaaaaammmmmaaaaaabcdefgabcdefg",
+			"mamamamamama",
+			"jklmnopqrstuvwxyzyxwvutsrqponmlkj",
+			"nmonqnmomnmomomno",
+			"mmmaaaabcdefgmmmmaaaammmaamm",
+			"mmmaaammmaaammmabcdefaaaammmmabcdefmmmaaaa",
+			"aaaaaaaazzzzzzzz",
+			"mmamammmmammamamaaamammma",
+			"abcdefghijklmnopqrrqponmlkjihgfedcba",
+		}.Select(s => s.Select(c => ((float)c - (float)'a') / s_lightStyleScale).ToArray())
+			.ToArray();
+
+		private long _frame = -1;
+		private float[] _lightStyleValues = new float[c_maxLightStyles];
 
 		public Camera Camera { get; set; }
 
@@ -53,6 +75,9 @@ namespace Q2Viewer
 			_worldBuffer = factory.CreateBuffer(new BufferDescription(64, BufferUsage.UniformBuffer | BufferUsage.Dynamic));
 			_device.UpdateBuffer(_worldBuffer, 0, Matrix4x4.Identity);
 
+			_lightStyleBuffer = factory.CreateBuffer(new BufferDescription(16, BufferUsage.UniformBuffer | BufferUsage.Dynamic));
+			_device.UpdateBuffer(_lightStyleBuffer, 0, new Vector4(1, 0, 0, 0));
+
 			var lmShaderSet = new ShaderSetDescription(
 				new[] {
 					s_lmVertexLayout
@@ -69,7 +94,8 @@ namespace Q2Viewer
 					));
 			var worldLayout = factory.CreateResourceLayout(
 				new ResourceLayoutDescription(
-					new ResourceLayoutElementDescription("WorldBuffer", ResourceKind.UniformBuffer, ShaderStages.Vertex)
+					new ResourceLayoutElementDescription("WorldBuffer", ResourceKind.UniformBuffer, ShaderStages.Vertex),
+					new ResourceLayoutElementDescription("ParamsBuffer", ResourceKind.UniformBuffer, ShaderStages.Fragment)
 				));
 			_diffuseLayout = factory.CreateResourceLayout(
 				new ResourceLayoutDescription(
@@ -78,8 +104,11 @@ namespace Q2Viewer
 				));
 			_lightmapLayout = factory.CreateResourceLayout(
 				new ResourceLayoutDescription(
-					new ResourceLayoutElementDescription("LightmapTexture", ResourceKind.TextureReadOnly, ShaderStages.Fragment),
-					new ResourceLayoutElementDescription("LightmapSampler", ResourceKind.Sampler, ShaderStages.Fragment)
+					new ResourceLayoutElementDescription("LightmapSampler", ResourceKind.Sampler, ShaderStages.Fragment),
+					new ResourceLayoutElementDescription("LightmapTexture1", ResourceKind.TextureReadOnly, ShaderStages.Fragment),
+					new ResourceLayoutElementDescription("LightmapTexture2", ResourceKind.TextureReadOnly, ShaderStages.Fragment),
+					new ResourceLayoutElementDescription("LightmapTexture3", ResourceKind.TextureReadOnly, ShaderStages.Fragment),
+					new ResourceLayoutElementDescription("LightmapTexture4", ResourceKind.TextureReadOnly, ShaderStages.Fragment)
 				));
 
 			_noBlendPipeline = factory.CreateGraphicsPipeline(new GraphicsPipelineDescription(
@@ -97,9 +126,10 @@ namespace Q2Viewer
 				projBuf,
 				viewBuf));
 
-			_worldBufferSet = factory.CreateResourceSet(new ResourceSetDescription(
+			_worldParamSet = factory.CreateResourceSet(new ResourceSetDescription(
 				worldLayout,
-				_worldBuffer
+				_worldBuffer,
+				_lightStyleBuffer
 			));
 
 			_diffuseSampler = factory.CreateSampler(new SamplerDescription(
@@ -144,6 +174,7 @@ namespace Q2Viewer
 				new[] { projViewLayout, worldAlphaLayout, _diffuseLayout },
 				_device.MainSwapchain.Framebuffer.OutputDescription
 			));
+			NextAnimationFrame();
 		}
 
 		private void CreateTextureSet(Texture texture, Sampler sampler, ResourceLayout layout)
@@ -156,6 +187,30 @@ namespace Q2Viewer
 			_textureSets.Add(texture, set);
 		}
 
+		private void CreateLightmapSet(LightmapList lightmaps, Sampler sampler)
+		{
+			var set = _device.ResourceFactory.CreateResourceSet(new ResourceSetDescription(
+				_lightmapLayout,
+				sampler,
+				lightmaps.Lightmap1,
+				lightmaps.Lightmap2,
+				lightmaps.Lightmap3,
+				lightmaps.Lightmap4
+			));
+			_textureSets.Add(lightmaps.Lightmap1, set);
+		}
+
+		public void NextAnimationFrame()
+		{
+			_frame++;
+			var styleCount = Math.Min(s_lightStyles.GetLength(0), c_maxLightStyles);
+			for (var i = 0; i < styleCount; i++)
+			{
+				var index = (int)(_frame % s_lightStyles[i].Length);
+				_lightStyleValues[i] = s_lightStyles[i][index];
+			}
+		}
+
 		private bool IsTransparent(TexturedFaceGroup fg) =>
 			fg.Flags.HasFlag(SurfaceFlags.Transparent33) ||
 			fg.Flags.HasFlag(SurfaceFlags.Transparent66);
@@ -166,11 +221,13 @@ namespace Q2Viewer
 			var calls = 0;
 			var clipMatrix = Camera.ViewMatrix * Camera.ProjectionMatrix;
 			cl.SetPipeline(_noBlendPipeline);
+			ReadOnlySpan<float> lightStyles = _lightStyleValues.AsSpan();
+
 			for (var i = 0; i < mri.FaceGroupsCount; i++)
 			{
 				ref var fg = ref mri.FaceGroups[i];
 				if (IsTransparent(fg)) continue;
-				DrawLightmapped(cl, ref fg, ref clipMatrix, ref calls);
+				DrawLightmapped(lightStyles, cl, ref fg, ref clipMatrix, ref calls);
 			}
 			cl.SetPipeline(_alphaBlendPipeline);
 			for (var i = 0; i < mri.FaceGroupsCount; i++)
@@ -182,7 +239,8 @@ namespace Q2Viewer
 			return calls;
 		}
 
-		private void DrawLightmapped(CommandList cl, ref TexturedFaceGroup fg, ref Matrix4x4 clipMatrix, ref int calls)
+		private float[] lightValues = new float[4];
+		private void DrawLightmapped(ReadOnlySpan<float> lightStyles, CommandList cl, ref TexturedFaceGroup fg, ref Matrix4x4 clipMatrix, ref int calls)
 		{
 			if (Util.CheckIfOutside(clipMatrix, fg.Bounds))
 				return;
@@ -193,14 +251,20 @@ namespace Q2Viewer
 				CreateTextureSet(diffuseTex, _diffuseSampler, _diffuseLayout);
 			var diffuseSet = _textureSets[diffuseTex];
 
-			var lightmapTex = fg.Lightmap ?? _whiteTexture;
-			if (!_textureSets.ContainsKey(lightmapTex))
-				CreateTextureSet(lightmapTex, _lightmapSampler, _lightmapLayout);
-			var lightmapSet = _textureSets[lightmapTex];
+			var lightmapTex = fg.Lightmap.IsNull() ? new LightmapList(() => _whiteTexture) : fg.Lightmap;
+			if (!_textureSets.ContainsKey(lightmapTex.Lightmap1))
+				CreateLightmapSet(lightmapTex, _lightmapSampler);
+			var lightmapSet = _textureSets[lightmapTex.Lightmap1];
+
+			lightValues[0] = fg.LightmapStyle1 == 255 ? 0 : lightStyles[fg.LightmapStyle1];
+			lightValues[1] = fg.LightmapStyle2 == 255 ? 0 : lightStyles[fg.LightmapStyle2];
+			lightValues[2] = fg.LightmapStyle3 == 255 ? 0 : lightStyles[fg.LightmapStyle3];
+			lightValues[3] = fg.LightmapStyle4 == 255 ? 0 : lightStyles[fg.LightmapStyle4];
+			cl.UpdateBuffer(_lightStyleBuffer, 0, lightValues);
 
 			cl.SetVertexBuffer(0, fg.Buffer);
 			cl.SetGraphicsResourceSet(0, _projViewSet);
-			cl.SetGraphicsResourceSet(1, _worldBufferSet);
+			cl.SetGraphicsResourceSet(1, _worldParamSet);
 			cl.SetGraphicsResourceSet(2, diffuseSet);
 			cl.SetGraphicsResourceSet(3, lightmapSet);
 			cl.Draw(fg.Count);
@@ -268,17 +332,31 @@ layout(location = 0) in vec2 fsin_texCoords;
 layout(location = 1) in vec2 fsin_lmCoords;
 layout(location = 0) out vec4 fsout_color;
 
+layout(set = 1, binding = 1) uniform ParamsBuffer
+{
+	vec4 LightValues;
+};
+
 layout(set = 2, binding = 0) uniform texture2D DiffuseTexture;
 layout(set = 2, binding = 1) uniform sampler DiffuseSampler;
-layout(set = 3, binding = 0) uniform texture2D LightmapTexture;
-layout(set = 3, binding = 1) uniform sampler LightmapSampler;
+
+layout(set = 3, binding = 0) uniform sampler LightmapSampler;
+layout(set = 3, binding = 1) uniform texture2D LightmapTexture1;
+layout(set = 3, binding = 2) uniform texture2D LightmapTexture2;
+layout(set = 3, binding = 3) uniform texture2D LightmapTexture3;
+layout(set = 3, binding = 4) uniform texture2D LightmapTexture4;
 
 void main()
 {
-	vec4 color = texture(sampler2D(DiffuseTexture, DiffuseSampler), fsin_texCoords);
-	vec4 lm = texture(sampler2D(LightmapTexture, LightmapSampler), fsin_lmCoords) * 1.3;
-	vec4 gamma = vec4(1.0 / 2.2);
-	fsout_color = pow(color * lm, gamma);
+	vec3 color = texture(sampler2D(DiffuseTexture, DiffuseSampler), fsin_texCoords).xyz;
+	vec3 lm1 = texture(sampler2D(LightmapTexture1, LightmapSampler), fsin_lmCoords).rgb * LightValues.x;
+	vec3 lm2 = texture(sampler2D(LightmapTexture2, LightmapSampler), fsin_lmCoords).rgb * LightValues.y;
+	vec3 lm3 = texture(sampler2D(LightmapTexture3, LightmapSampler), fsin_lmCoords).rgb * LightValues.z;
+	vec3 lm4 = texture(sampler2D(LightmapTexture4, LightmapSampler), fsin_lmCoords).rgb * LightValues.w;
+	vec3 lm = lm1 + lm2 + lm3 + lm4;
+
+	vec3 gamma = vec3(1.0 / 2.2);
+	fsout_color = vec4(pow(color * lm, gamma), 1);
 }";
 
 		private const string AlphaBlendVert = @"

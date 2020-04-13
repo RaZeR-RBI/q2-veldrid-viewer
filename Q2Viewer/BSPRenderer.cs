@@ -12,17 +12,42 @@ namespace Q2Viewer
 	{
 		public SurfaceFlags Flags;
 		public Texture Texture;
-		public Texture Lightmap;
+		public LightmapList Lightmap;
 		public DeviceBuffer Buffer;
 		public uint Count;
 		public AABB Bounds;
 
+		public byte LightmapStyle1;
+		public byte LightmapStyle2;
+		public byte LightmapStyle3;
+		public byte LightmapStyle4;
+
+		public void SetLightmapStyles(int styles)
+		{
+			LightmapStyle1 = (byte)(styles & 0x000000FF);
+			LightmapStyle2 = (byte)((styles >> 8) & 0x000000FF);
+			LightmapStyle3 = (byte)((styles >> 16) & 0x000000FF);
+			LightmapStyle4 = (byte)((styles >> 24) & 0x000000FF);
+		}
+
+		public int GetLightmapCount()
+		{
+			if (LightmapStyle4 != 255) return 4;
+			if (LightmapStyle3 != 255) return 3;
+			if (LightmapStyle2 != 255) return 2;
+			if (LightmapStyle1 != 255) return 1;
+			return 0;
+		}
+
+
 		public void Dispose()
 		{
 			Texture?.Dispose();
-			Lightmap?.Dispose();
+			for (var i = 0; i < 4; i++)
+				Lightmap.GetLightmap(i)?.Dispose();
 			Buffer?.Dispose();
-			Texture = Lightmap = null;
+			Texture = null;
+			Lightmap = new LightmapList();
 			Buffer = null;
 			Count = 0;
 		}
@@ -108,7 +133,7 @@ namespace Q2Viewer
 				{
 					ref var face = ref _file.Faces.Data[i];
 					ref var tex = ref _file.TextureInfos.Data[face.TextureInfoId];
-					return (TextureName: tex.TextureName.ToLowerInvariant(), tex.Flags);
+					return (TextureName: tex.TextureName.ToLowerInvariant(), tex.Flags, face.LightmapStyles);
 				});
 
 			// TODO: Build lightmaps
@@ -126,6 +151,7 @@ namespace Q2Viewer
 					BSPReader.GetFaceVertexCount(_file.Faces.Data[id])).Sum();
 				tfg.Flags = group.Key.Flags;
 				tfg.Count = count;
+				tfg.SetLightmapStyles(group.Key.LightmapStyles);
 
 				var vertices = _allocator.Rent<VertexNTL>((int)count);
 				var offset = 0;
@@ -149,8 +175,9 @@ namespace Q2Viewer
 
 					if (hasLightmap)
 					{
-						_lm.AllocateBlock(_file.Lighting.RawData, f.LightOffset, tExt,
-							out Vector2 lmPos, out Vector2 lmSize, out Texture lmTexture);
+						var numMaps = tfg.GetLightmapCount();
+						_lm.AllocateBlock(numMaps, _file.Lighting.RawData, f.LightOffset, tExt,
+							out Vector2 lmPos, out Vector2 lmSize, out LightmapList lmTexture);
 						Debug.Assert(vertices.Select(v => v.LightmapUV).Distinct().Count() > 1);
 						for (var k = offset - vt.Length; k < offset; k++)
 						{
@@ -162,7 +189,6 @@ namespace Q2Viewer
 						// TODO: Check if it's a new lightmap and split into new face group if so
 						tfg.Lightmap = lmTexture;
 					}
-					else tfg.Lightmap = null;
 				});
 				// calculate AABB
 				var min = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue);
@@ -178,7 +204,7 @@ namespace Q2Viewer
 				var buffer = _gd.ResourceFactory.CreateBuffer(
 					new BufferDescription(count * VertexNTL.SizeInBytes, BufferUsage.VertexBuffer)
 				);
-				UpdateBuffer(buffer, vertices, count, VertexNTL.SizeInBytes);
+				_gd.UpdateBuffer(buffer, vertices, count, VertexNTL.SizeInBytes);
 				tfg.Buffer = buffer;
 				mri.FaceGroups[tfgId] = tfg;
 				tfgId++;
@@ -213,19 +239,9 @@ namespace Q2Viewer
 					offset += 2;
 				}
 			}
-			UpdateBuffer(buffer, vertices, count, vertexSize);
+			_gd.UpdateBuffer(buffer, vertices, count, vertexSize);
 			_allocator.Return(vertices);
 			return buffer;
-		}
-
-		private void UpdateBuffer<T>(DeviceBuffer buffer, T[] data, uint count, uint itemSize)
-		{
-			var memory = new Memory<T>(data, 0, (int)count);
-			using (var handle = memory.Pin())
-				unsafe
-				{
-					_gd.UpdateBuffer(buffer, 0, (IntPtr)handle.Pointer, count * itemSize);
-				}
 		}
 
 		public DeviceBuffer BuildDebugModelBuffers(
@@ -268,7 +284,7 @@ namespace Q2Viewer
 
 			var buffer = gd.ResourceFactory.CreateBuffer(
 				new BufferDescription(count * vertexSize, BufferUsage.VertexBuffer));
-			UpdateBuffer(buffer, vertices, count, vertexSize);
+			gd.UpdateBuffer(buffer, vertices, count, vertexSize);
 			_allocator.Return(vertices);
 			return buffer;
 		}

@@ -7,6 +7,36 @@ using Veldrid;
 
 namespace Q2Viewer
 {
+	public struct LightmapList
+	{
+		public Texture Lightmap1;
+		public Texture Lightmap2;
+		public Texture Lightmap3;
+		public Texture Lightmap4;
+
+		public bool IsNull() => Lightmap1 == null || Lightmap2 == null || Lightmap3 == null || Lightmap4 == null;
+
+		public LightmapList(Func<Texture> factory)
+		{
+			Lightmap1 = factory();
+			Lightmap2 = factory();
+			Lightmap3 = factory();
+			Lightmap4 = factory();
+		}
+
+		public Texture GetLightmap(int index)
+		{
+			switch (index)
+			{
+				case 0: return Lightmap1;
+				case 1: return Lightmap2;
+				case 2: return Lightmap3;
+				case 3: return Lightmap4;
+			}
+			return null;
+		}
+	}
+
 	public class LightmapAllocator
 	{
 		public const uint BlockSize = 4096;
@@ -19,13 +49,13 @@ namespace Q2Viewer
 
 		private struct LightmapAllocData
 		{
-			public Texture StagingTexture;
+			public LightmapList Staging;
 			public uint RowHeight;
 			public uint CurrentU;
 			public uint CurrentV;
 
-			public LightmapAllocData(Texture texture) =>
-				(StagingTexture, RowHeight, CurrentU, CurrentV) = (texture, c_padding, c_padding, c_padding);
+			public LightmapAllocData(LightmapList texture) =>
+				(Staging, RowHeight, CurrentU, CurrentV) = (texture, c_padding, c_padding, c_padding);
 
 			public static Vector2i GetLightmapSize(Vector2i extents) =>
 				(extents / c_lightmapScale) + new Vector2i(1, 1);
@@ -63,8 +93,8 @@ namespace Q2Viewer
 
 		private readonly GraphicsDevice _gd;
 		private readonly IArrayAllocator _allocator;
-		private readonly List<(LightmapAllocData data, Texture target)> _lightmaps =
-			new List<(LightmapAllocData data, Texture texture)>();
+		private readonly List<(LightmapAllocData data, LightmapList target)> _lightmaps =
+			new List<(LightmapAllocData data, LightmapList texture)>();
 
 		public LightmapAllocator(GraphicsDevice gd, IArrayAllocator allocator)
 		{
@@ -72,9 +102,9 @@ namespace Q2Viewer
 			CreateNewBlock();
 		}
 
-		private bool AllocateInCurrentBlock(uint uMax, uint vMax, out uint u, out uint v, out Texture staging)
+		private bool AllocateInCurrentBlock(uint uMax, uint vMax, out uint u, out uint v, out LightmapList staging)
 		{
-			staging = null;
+			staging = new LightmapList();
 			u = v = uint.MaxValue;
 			if (!_lightmaps.Any()) return false;
 			var index = _lightmaps.Count - 1;
@@ -82,27 +112,23 @@ namespace Q2Viewer
 			var data = item.data;
 			var result = data.Advance(uMax, vMax, BlockSize, out u, out v);
 			if (result)
-				staging = data.StagingTexture;
+				staging = data.Staging;
 			_lightmaps[index] = (data, item.target);
 			return result;
 		}
 
+		private Texture CreateTexture(bool staging) =>
+			_gd.ResourceFactory.CreateTexture(new TextureDescription(
+				BlockSize, BlockSize, 1, 1, 1,
+				PixelFormat.B8_G8_R8_A8_UNorm,
+				staging ? TextureUsage.Staging : TextureUsage.Sampled,
+				TextureType.Texture2D
+			));
+
 		private void CreateNewBlock()
 		{
-			var rf = _gd.ResourceFactory;
-			var target = rf.CreateTexture(new TextureDescription(
-				BlockSize, BlockSize, 1, 1, 1,
-				PixelFormat.B8_G8_R8_A8_UNorm,
-				TextureUsage.Sampled,
-				TextureType.Texture2D
-			));
-			var staging = rf.CreateTexture(new TextureDescription(
-				BlockSize, BlockSize, 1, 1, 1,
-				PixelFormat.B8_G8_R8_A8_UNorm,
-				TextureUsage.Staging,
-				TextureType.Texture2D
-			));
-			var block = new LightmapAllocData(staging);
+			var block = new LightmapAllocData(new LightmapList(() => CreateTexture(staging: true)));
+			var target = new LightmapList(() => CreateTexture(staging: false));
 			_lightmaps.Add((block, target));
 		}
 
@@ -119,17 +145,17 @@ namespace Q2Viewer
 		}
 
 		public void AllocateBlock(
+			int numMaps,
 			byte[] data,
 			int offset,
 			Vector2i extents,
 			out Vector2 position,
 			out Vector2 scale,
-			out Texture texture)
+			out LightmapList texture)
 		{
 			var u = 0u;
 			var v = 0u;
-			Texture staging = null;
-			if (AllocateInCurrentBlock((uint)extents.X, (uint)extents.Y, out u, out v, out staging))
+			if (AllocateInCurrentBlock((uint)extents.X, (uint)extents.Y, out u, out v, out LightmapList staging))
 				goto process;
 
 			// we don't do that because the renderer doesn't switch between lightmaps properly right now
@@ -149,24 +175,29 @@ namespace Q2Viewer
 			texture = _lightmaps.Last().target;
 			var texSize = LightmapAllocData.GetLightmapSize(extents);
 			var pixelCount = texSize.X * texSize.Y;
-			Span<ColorRGBA> pixels = stackalloc ColorRGBA[pixelCount];
-			for (var i = 0; i < pixelCount; i++)
-				pixels[i] = new ColorRGBA(
-					data[offset + i * 3 + 2],
-					data[offset + i * 3 + 1],
-					data[offset + i * 3]
-				);
-			var sizeInBytes = (uint)pixelCount * 4;
-			unsafe
+			var black = new ColorRGBA(0, 0, 0);
+			for (var map = 0; map < 4; map++)
 			{
-				fixed (ColorRGBA* bp = pixels)
+				var isBlack = map >= numMaps;
+				Span<ColorRGBA> pixels = stackalloc ColorRGBA[pixelCount];
+				for (var i = 0; i < pixelCount; i++)
+					pixels[i] = isBlack ? black : new ColorRGBA(
+						data[offset + i * 3 + 2],
+						data[offset + i * 3 + 1],
+						data[offset + i * 3]
+					);
+				var sizeInBytes = (uint)pixelCount * 4;
+				unsafe
 				{
-					_gd.UpdateTexture(staging,
-					(IntPtr)bp,
-					sizeInBytes,
-					u, v, 0,
-					(uint)texSize.X, (uint)texSize.Y, 1,
-					0, 0);
+					fixed (ColorRGBA* bp = pixels)
+					{
+						_gd.UpdateTexture(staging.GetLightmap(map),
+						(IntPtr)bp,
+						sizeInBytes,
+						u, v, 0,
+						(uint)texSize.X, (uint)texSize.Y, 1,
+						0, 0);
+					}
 				}
 			}
 		}
@@ -177,7 +208,8 @@ namespace Q2Viewer
 			var cl = _gd.ResourceFactory.CreateCommandList();
 			cl.Begin();
 			foreach (var (data, target) in _lightmaps)
-				cl.CopyTexture(data.StagingTexture, target);
+				for (var i = 0; i < 4; i++)
+					cl.CopyTexture(data.Staging.GetLightmap(i), target.GetLightmap(i));
 			cl.End();
 
 			_gd.SubmitCommands(cl);

@@ -19,7 +19,7 @@ namespace Q2Viewer
 		private DeviceBuffer _viewBuf;
 		private DeviceBuffer _projBuf;
 		private DebugPrimitives _debugPrimitives;
-		private ModelRenderer _lightmapRenderer;
+		private ModelRenderer _modelRenderer;
 		private BSPRenderer _renderer;
 		private readonly Options _options;
 		private IFileSystem _fs;
@@ -79,7 +79,7 @@ namespace Q2Viewer
 			_viewBuf = factory.CreateBuffer(new BufferDescription(64, BufferUsage.UniformBuffer | BufferUsage.Dynamic));
 			_projBuf = factory.CreateBuffer(new BufferDescription(64, BufferUsage.UniformBuffer | BufferUsage.Dynamic));
 			_debugPrimitives = new DebugPrimitives(Graphics, _viewBuf, _projBuf, _camera);
-			_lightmapRenderer = new ModelRenderer(Graphics, _viewBuf, _projBuf, _camera);
+			_modelRenderer = new ModelRenderer(Graphics, _viewBuf, _projBuf, _camera);
 
 			var bspFileStream = System.IO.File.OpenRead(_options.MapPath);
 			var bspFile = new BSPFile(bspFileStream, SharedArrayPoolAllocator.Instance);
@@ -87,9 +87,11 @@ namespace Q2Viewer
 			_renderer = new BSPRenderer(bspFile, SharedArrayPoolAllocator.Instance, Graphics, _fs);
 		}
 
+		private float _animTime = 0f;
 		protected override void Update(TimeSpan frameTime)
 		{
-			_camera.Update((float)frameTime.Ticks / TimeSpan.TicksPerSecond);
+			var deltaSeconds = (float)frameTime.Ticks / TimeSpan.TicksPerSecond;
+			_camera.Update(deltaSeconds);
 
 			if (InputTracker.IsKeyTriggered(Keycode.NUMBER_1))
 				_showWireframe = !_showWireframe;
@@ -99,6 +101,12 @@ namespace Q2Viewer
 				_showGizmo = !_showGizmo;
 
 			InputTracker.AfterUpdate();
+			_animTime += deltaSeconds;
+			if (_animTime >= 0.01f)
+			{
+				_animTime -= 0.01f;
+				_modelRenderer.NextAnimationFrame();
+			}
 		}
 
 		protected override void Draw(TimeSpan frameTime)
@@ -116,11 +124,10 @@ namespace Q2Viewer
 			if (_showColored)
 				_renderer.DrawDebugModels(_cl, _debugPrimitives);
 			else
-				_renderer.Draw(_cl, _lightmapRenderer);
+				_renderer.Draw(_cl, _modelRenderer);
 
 			if (_showWireframe)
 				_renderer.DrawWireframe(_cl, _debugPrimitives);
-
 			_cl.End();
 			Graphics.SubmitCommands(_cl);
 		}
