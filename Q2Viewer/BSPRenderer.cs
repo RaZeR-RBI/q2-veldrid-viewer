@@ -80,7 +80,7 @@ namespace Q2Viewer
 				if (mb != null)
 				{
 					_debugModels.Add((mb, count));
-					continue;
+					// continue;
 				}
 				// we got an invisible model - a trigger or something
 				var wf = BuildDebugEdgeBuffer(gd,

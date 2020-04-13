@@ -10,6 +10,7 @@ namespace Q2Viewer
 
 		public static Vector2 MouseDelta { get; private set; }
 
+		private static HashSet<Keycode> _previousKeys = new HashSet<Keycode>(10);
 		private static HashSet<Keycode> _pressedKeys = new HashSet<Keycode>(10);
 		private static HashSet<MouseButton> _mouseButtons = new HashSet<MouseButton>(10);
 
@@ -35,7 +36,13 @@ namespace Q2Viewer
 		public static void AfterUpdate()
 		{
 			MouseDelta = Vector2.Zero;
+			_previousKeys.RemoveWhere(k => !_pressedKeys.Contains(k));
+			foreach (var key in _pressedKeys)
+				_previousKeys.Add(key);
 		}
+
+		public static bool IsKeyTriggered(Keycode keycode) =>
+			_pressedKeys.Contains(keycode) && !_previousKeys.Contains(keycode);
 
 		public static bool GetKey(Keycode keycode) => _pressedKeys.Contains(keycode);
 

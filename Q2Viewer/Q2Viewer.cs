@@ -24,8 +24,11 @@ namespace Q2Viewer
 		private readonly Options _options;
 		private IFileSystem _fs;
 
+		private bool _showWireframe = false;
+		private bool _showColored = false;
+		private bool _showGizmo = false;
 
-		// TODO: Read paths to PAKs to get textures from
+
 		public Q2Viewer(Options options) : base(
 			new WindowSettings()
 			{
@@ -87,6 +90,14 @@ namespace Q2Viewer
 		protected override void Update(TimeSpan frameTime)
 		{
 			_camera.Update((float)frameTime.Ticks / TimeSpan.TicksPerSecond);
+
+			if (InputTracker.IsKeyTriggered(Keycode.NUMBER_1))
+				_showWireframe = !_showWireframe;
+			if (InputTracker.IsKeyTriggered(Keycode.NUMBER_2))
+				_showColored = !_showColored;
+			if (InputTracker.IsKeyTriggered(Keycode.NUMBER_3))
+				_showGizmo = !_showGizmo;
+
 			InputTracker.AfterUpdate();
 		}
 
@@ -98,12 +109,19 @@ namespace Q2Viewer
 			_cl.ClearDepthStencil(1.0f);
 			_cl.UpdateBuffer(_viewBuf, 0, _camera.ViewMatrix);
 			_cl.UpdateBuffer(_projBuf, 0, _camera.ProjectionMatrix);
-			// _debugPrimitives.DrawGizmo(_cl);
-			// _debugPrimitives.DrawCube(_cl, Vector3.Zero);
-			var calls = _renderer.Draw(_cl, _lightmapRenderer);
-			// _renderer.DrawDebugModels(_cl, _debugPrimitives);
+
+			if (_showGizmo)
+				_debugPrimitives.DrawGizmo(_cl);
+
+			if (_showColored)
+				_renderer.DrawDebugModels(_cl, _debugPrimitives);
+			else
+				_renderer.Draw(_cl, _lightmapRenderer);
+
+			if (_showWireframe)
+				_renderer.DrawWireframe(_cl, _debugPrimitives);
+
 			_cl.End();
-			Window.Title = $"Q2 Viewer (DC: {calls})";
 			Graphics.SubmitCommands(_cl);
 		}
 

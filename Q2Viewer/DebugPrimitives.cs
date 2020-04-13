@@ -29,7 +29,7 @@ void main()
     vec4 worldPosition = World * vec4(Position, 1);
     vec4 viewPosition = View * worldPosition;
     vec4 clipPosition = Projection * viewPosition;
-    gl_Position = clipPosition;
+    gl_Position = clipPosition + vec4(0, 0, 0, 0.001);
     fsin_Color = Color;
 }";
 
