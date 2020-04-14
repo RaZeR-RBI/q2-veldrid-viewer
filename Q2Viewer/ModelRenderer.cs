@@ -70,7 +70,7 @@ namespace Q2Viewer
 			Camera = camera;
 			var factory = _device.ResourceFactory;
 
-			_whiteTexture = TexturePool.CreateWhiteTexture(_device);
+			_whiteTexture = TexturePool.CreateWhiteTexture(_device, layers: LightmapAllocator.LightmapsPerFace);
 
 			_worldBuffer = factory.CreateBuffer(new BufferDescription(64, BufferUsage.UniformBuffer | BufferUsage.Dynamic));
 			_device.UpdateBuffer(_worldBuffer, 0, Matrix4x4.Identity);
@@ -106,10 +106,7 @@ namespace Q2Viewer
 			_lightmapLayout = factory.CreateResourceLayout(
 				new ResourceLayoutDescription(
 					new ResourceLayoutElementDescription("LightmapSampler", ResourceKind.Sampler, ShaderStages.Fragment),
-					new ResourceLayoutElementDescription("LightmapTexture1", ResourceKind.TextureReadOnly, ShaderStages.Fragment),
-					new ResourceLayoutElementDescription("LightmapTexture2", ResourceKind.TextureReadOnly, ShaderStages.Fragment),
-					new ResourceLayoutElementDescription("LightmapTexture3", ResourceKind.TextureReadOnly, ShaderStages.Fragment),
-					new ResourceLayoutElementDescription("LightmapTexture4", ResourceKind.TextureReadOnly, ShaderStages.Fragment)
+					new ResourceLayoutElementDescription("LightmapTexture", ResourceKind.TextureReadOnly, ShaderStages.Fragment)
 				));
 
 			_noBlendPipeline = factory.CreateGraphicsPipeline(new GraphicsPipelineDescription(
@@ -188,17 +185,14 @@ namespace Q2Viewer
 			_textureSets.Add(texture, set);
 		}
 
-		private void CreateLightmapSet(LightmapList lightmaps, Sampler sampler)
+		private void CreateLightmapSet(Texture lightmap, Sampler sampler)
 		{
 			var set = _device.ResourceFactory.CreateResourceSet(new ResourceSetDescription(
 				_lightmapLayout,
 				sampler,
-				lightmaps.Lightmap1,
-				lightmaps.Lightmap2,
-				lightmaps.Lightmap3,
-				lightmaps.Lightmap4
+				lightmap
 			));
-			_textureSets.Add(lightmaps.Lightmap1, set);
+			_textureSets.Add(lightmap, set);
 		}
 
 		public void NextAnimationFrame()
@@ -253,10 +247,10 @@ namespace Q2Viewer
 				CreateTextureSet(diffuseTex, _diffuseSampler, _diffuseLayout);
 			var diffuseSet = _textureSets[diffuseTex];
 
-			var lightmapTex = fg.Lightmap.IsNull() ? new LightmapList(() => _whiteTexture) : fg.Lightmap;
-			if (!_textureSets.ContainsKey(lightmapTex.Lightmap1))
+			var lightmapTex = fg.Lightmap ?? _whiteTexture;
+			if (!_textureSets.ContainsKey(lightmapTex))
 				CreateLightmapSet(lightmapTex, _lightmapSampler);
-			var lightmapSet = _textureSets[lightmapTex.Lightmap1];
+			var lightmapSet = _textureSets[lightmapTex];
 
 			lightValues[0] = fg.LightmapStyle1 == 255 ? 0 : lightStyles[fg.LightmapStyle1];
 			lightValues[1] = fg.LightmapStyle2 == 255 ? 0 : lightStyles[fg.LightmapStyle2];
@@ -341,18 +335,15 @@ layout(set = 2, binding = 0) uniform texture2D DiffuseTexture;
 layout(set = 2, binding = 1) uniform sampler DiffuseSampler;
 
 layout(set = 3, binding = 0) uniform sampler LightmapSampler;
-layout(set = 3, binding = 1) uniform texture2D LightmapTexture1;
-layout(set = 3, binding = 2) uniform texture2D LightmapTexture2;
-layout(set = 3, binding = 3) uniform texture2D LightmapTexture3;
-layout(set = 3, binding = 4) uniform texture2D LightmapTexture4;
+layout(set = 3, binding = 1) uniform texture2DArray LightmapTexture;
 
 void main()
 {
 	vec3 color = texture(sampler2D(DiffuseTexture, DiffuseSampler), fsin_texCoords).xyz;
-	vec3 lm1 = texture(sampler2D(LightmapTexture1, LightmapSampler), fsin_lmCoords).rgb * LightValues.x;
-	vec3 lm2 = texture(sampler2D(LightmapTexture2, LightmapSampler), fsin_lmCoords).rgb * LightValues.y;
-	vec3 lm3 = texture(sampler2D(LightmapTexture3, LightmapSampler), fsin_lmCoords).rgb * LightValues.z;
-	vec3 lm4 = texture(sampler2D(LightmapTexture4, LightmapSampler), fsin_lmCoords).rgb * LightValues.w;
+	vec3 lm1 = texture(sampler2DArray(LightmapTexture, LightmapSampler), vec3(fsin_lmCoords, 0)).rgb * LightValues.x;
+	vec3 lm2 = texture(sampler2DArray(LightmapTexture, LightmapSampler), vec3(fsin_lmCoords, 1)).rgb * LightValues.y;
+	vec3 lm3 = texture(sampler2DArray(LightmapTexture, LightmapSampler), vec3(fsin_lmCoords, 2)).rgb * LightValues.z;
+	vec3 lm4 = texture(sampler2DArray(LightmapTexture, LightmapSampler), vec3(fsin_lmCoords, 3)).rgb * LightValues.w;
 	vec3 lm = lm1 + lm2 + lm3 + lm4;
 
 	vec3 gamma = vec3(1.0 / 2.2);

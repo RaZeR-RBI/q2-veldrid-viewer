@@ -50,10 +50,10 @@ namespace Q2Viewer
 			CreateFallbackTexture();
 		}
 
-		public static Texture CreateWhiteTexture(GraphicsDevice device) =>
+		public static Texture CreateWhiteTexture(GraphicsDevice device, uint layers) =>
 			TexturePool.CreateTexture(device, 1, 1, new ColorRGBA[] {
 				new ColorRGBA(255, 255, 255),
-			}, "_FALLBACK_WHITE");
+			}, "_FALLBACK_WHITE", layers);
 
 		private bool _isDisposed = false;
 		public void Dispose()
@@ -98,7 +98,7 @@ namespace Q2Viewer
 			return texture;
 		}
 
-		public static Texture CreateTexture(GraphicsDevice device, int width, int height, ColorRGBA[] pixels, string name = null)
+		public static Texture CreateTexture(GraphicsDevice device, int width, int height, ColorRGBA[] pixels, string name = null, uint layers = 1)
 		{
 			var genMipmaps = (width > 1 && height > 1);
 			var usage = TextureUsage.Sampled;
@@ -106,10 +106,11 @@ namespace Q2Viewer
 
 			var rf = device.ResourceFactory;
 			var texture = rf.CreateTexture(new TextureDescription(
-				(uint)width, (uint)height, 1, genMipmaps ? 4u : 1u, 1, PixelFormat.R8_G8_B8_A8_UNorm, usage, TextureType.Texture2D
+				(uint)width, (uint)height, 1, genMipmaps ? 4u : 1u, layers, PixelFormat.R8_G8_B8_A8_UNorm, usage, TextureType.Texture2D
 			));
 			if (name != null) texture.Name = name;
-			device.UpdateTexture<ColorRGBA>(texture, pixels, 0, 0, 0, (uint)width, (uint)height, 1, 0, 0);
+			for (var layer = 0u; layer < layers; layer++)
+				device.UpdateTexture<ColorRGBA>(texture, pixels, 0, 0, 0, (uint)width, (uint)height, 1, 0, layer);
 
 			if (!genMipmaps) return texture;
 

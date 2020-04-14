@@ -12,7 +12,7 @@ namespace Q2Viewer
 	{
 		public SurfaceFlags Flags;
 		public Texture Texture;
-		public LightmapList Lightmap;
+		public Texture Lightmap;
 		public uint BufferOffset;
 		public uint Count;
 		public AABB Bounds;
@@ -43,11 +43,9 @@ namespace Q2Viewer
 		public void Dispose()
 		{
 			Texture?.Dispose();
-			for (var i = 0; i < 4; i++)
-				Lightmap.GetLightmap(i)?.Dispose();
+			Lightmap?.Dispose();
 			BufferOffset = 0;
-			Texture = null;
-			Lightmap = new LightmapList();
+			Texture = Lightmap = null;
 			Count = 0;
 		}
 	}
@@ -73,8 +71,6 @@ namespace Q2Viewer
 
 	public class BSPRenderer
 	{
-		private const uint c_maxVertices = (uint)ushort.MaxValue;
-
 		private readonly BSPReader _reader;
 		private readonly BSPFile _file;
 		private readonly IArrayAllocator _allocator;
@@ -125,7 +121,12 @@ namespace Q2Viewer
 		{
 			var fFirstIndex = model.FirstFace;
 			var fCount = model.NumFaces;
+
 			// TODO: Think about doing this without LINQ
+			var totalVertices = Enumerable.Range(fFirstIndex, fCount)
+				.Select(i => BSPReader.GetFaceVertexCount(_file.Faces.Data[i]))
+				.Sum();
+
 			var grouping = Enumerable.Range(fFirstIndex, fCount)
 				.Where(i =>
 				{
@@ -145,7 +146,7 @@ namespace Q2Viewer
 			mri.FaceGroupsCount = grouping.Count();
 			mri.FaceGroups = _allocator.Rent<TexturedFaceGroup>(mri.FaceGroupsCount);
 			mri.Buffer = _gd.ResourceFactory.CreateBuffer(
-				new BufferDescription(c_maxVertices * VertexNTL.SizeInBytes, BufferUsage.VertexBuffer)
+				new BufferDescription((uint)totalVertices * VertexNTL.SizeInBytes, BufferUsage.VertexBuffer)
 			);
 			var tfgId = 0;
 			var bufferOffset = 0u;
@@ -186,7 +187,7 @@ namespace Q2Viewer
 					{
 						var numMaps = tfg.GetLightmapCount();
 						_lm.AllocateBlock(numMaps, _file.Lighting.RawData, f.LightOffset, tExt,
-							out Vector2 lmPos, out Vector2 lmSize, out LightmapList lmTexture);
+							out Vector2 lmPos, out Vector2 lmSize, out Texture lmTexture);
 						Debug.Assert(vertices.Select(v => v.LightmapUV).Distinct().Count() > 1);
 						for (var k = offset - vt.Length; k < offset; k++)
 						{
