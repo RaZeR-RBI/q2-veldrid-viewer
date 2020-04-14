@@ -13,7 +13,7 @@ namespace Q2Viewer
 		public SurfaceFlags Flags;
 		public Texture Texture;
 		public LightmapList Lightmap;
-		public DeviceBuffer Buffer;
+		public uint BufferOffset;
 		public uint Count;
 		public AABB Bounds;
 
@@ -45,10 +45,9 @@ namespace Q2Viewer
 			Texture?.Dispose();
 			for (var i = 0; i < 4; i++)
 				Lightmap.GetLightmap(i)?.Dispose();
-			Buffer?.Dispose();
+			BufferOffset = 0;
 			Texture = null;
 			Lightmap = new LightmapList();
-			Buffer = null;
 			Count = 0;
 		}
 	}
@@ -57,6 +56,7 @@ namespace Q2Viewer
 	{
 		public TexturedFaceGroup[] FaceGroups;
 		public int FaceGroupsCount;
+		public DeviceBuffer Buffer;
 
 		public void Dispose(IArrayAllocator allocator)
 		{
@@ -66,11 +66,15 @@ namespace Q2Viewer
 			allocator.Return(FaceGroups);
 			FaceGroups = null;
 			FaceGroupsCount = 0;
+			Buffer?.Dispose();
+			Buffer = null;
 		}
 	}
 
 	public class BSPRenderer
 	{
+		private const uint c_maxVertices = (uint)ushort.MaxValue;
+
 		private readonly BSPReader _reader;
 		private readonly BSPFile _file;
 		private readonly IArrayAllocator _allocator;
@@ -140,7 +144,11 @@ namespace Q2Viewer
 			var mri = new ModelRenderInfo();
 			mri.FaceGroupsCount = grouping.Count();
 			mri.FaceGroups = _allocator.Rent<TexturedFaceGroup>(mri.FaceGroupsCount);
+			mri.Buffer = _gd.ResourceFactory.CreateBuffer(
+				new BufferDescription(c_maxVertices * VertexNTL.SizeInBytes, BufferUsage.VertexBuffer)
+			);
 			var tfgId = 0;
+			var bufferOffset = 0u;
 
 			foreach (var group in grouping)
 			{
@@ -151,6 +159,7 @@ namespace Q2Viewer
 					BSPReader.GetFaceVertexCount(_file.Faces.Data[id])).Sum();
 				tfg.Flags = group.Key.Flags;
 				tfg.Count = count;
+				tfg.BufferOffset = bufferOffset;
 				tfg.SetLightmapStyles(group.Key.LightmapStyles);
 
 				var vertices = _allocator.Rent<VertexNTL>((int)count);
@@ -201,13 +210,10 @@ namespace Q2Viewer
 				}
 				tfg.Bounds = new AABB(min, max);
 
-				var buffer = _gd.ResourceFactory.CreateBuffer(
-					new BufferDescription(count * VertexNTL.SizeInBytes, BufferUsage.VertexBuffer)
-				);
-				_gd.UpdateBuffer(buffer, vertices, count, VertexNTL.SizeInBytes);
-				tfg.Buffer = buffer;
+				_gd.UpdateBuffer(mri.Buffer, vertices, count, VertexNTL.SizeInBytes, bufferOffset);
 				mri.FaceGroups[tfgId] = tfg;
 				tfgId++;
+				bufferOffset += count;
 			}
 			_lm.CompileLightmaps();
 			return mri;

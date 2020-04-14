@@ -221,6 +221,7 @@ namespace Q2Viewer
 			cl.UpdateBuffer(_worldBuffer, 0, worldMatrix);
 			var calls = 0;
 			var clipMatrix = Camera.ViewMatrix * Camera.ProjectionMatrix;
+			cl.SetVertexBuffer(0, mri.Buffer);
 			cl.SetPipeline(_noBlendPipeline);
 			ReadOnlySpan<float> lightStyles = _lightStyleValues.AsSpan();
 
@@ -263,12 +264,11 @@ namespace Q2Viewer
 			lightValues[3] = fg.LightmapStyle4 == 255 ? 0 : lightStyles[fg.LightmapStyle4];
 			cl.UpdateBuffer(_lightStyleBuffer, 0, lightValues);
 
-			cl.SetVertexBuffer(0, fg.Buffer);
 			cl.SetGraphicsResourceSet(0, _projViewSet);
 			cl.SetGraphicsResourceSet(1, _worldParamSet);
 			cl.SetGraphicsResourceSet(2, diffuseSet);
 			cl.SetGraphicsResourceSet(3, lightmapSet);
-			cl.Draw(fg.Count);
+			cl.Draw(fg.Count, 1, fg.BufferOffset, 0);
 			calls++;
 		}
 
@@ -285,11 +285,10 @@ namespace Q2Viewer
 			var diffuseSet = _textureSets[diffuseTex];
 
 			cl.UpdateBuffer(_alphaValueBuffer, 0, transparency);
-			cl.SetVertexBuffer(0, fg.Buffer);
 			cl.SetGraphicsResourceSet(0, _projViewSet);
 			cl.SetGraphicsResourceSet(1, _worldAlphaSet);
 			cl.SetGraphicsResourceSet(2, diffuseSet);
-			cl.Draw(fg.Count);
+			cl.Draw(fg.Count, 1, fg.BufferOffset, 0);
 			calls++;
 		}
 

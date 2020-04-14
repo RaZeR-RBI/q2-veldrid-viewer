@@ -5,14 +5,14 @@ namespace Q2Viewer
 {
 	public static class GraphicsDeviceExtensions
 	{
-		public static void UpdateBuffer<T>(this GraphicsDevice gd, DeviceBuffer buffer, T[] data, uint count, uint itemSize)
+		public static void UpdateBuffer<T>(this GraphicsDevice gd, DeviceBuffer buffer, T[] data, uint count, uint itemSize, uint offset = 0)
 		{
 			// TODO: Investigate if there is a better way to do that
 			var memory = new Memory<T>(data, 0, (int)count);
 			using (var handle = memory.Pin())
 				unsafe
 				{
-					gd.UpdateBuffer(buffer, 0, (IntPtr)handle.Pointer, count * itemSize);
+					gd.UpdateBuffer(buffer, offset * itemSize, (IntPtr)handle.Pointer, count * itemSize);
 				}
 		}
 
