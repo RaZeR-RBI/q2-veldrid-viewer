@@ -199,6 +199,7 @@ namespace Q2Viewer
 						0, 0);
 					}
 				}
+				offset += pixelCount * 3;
 			}
 		}
 

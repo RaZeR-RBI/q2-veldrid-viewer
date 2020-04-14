@@ -102,6 +102,7 @@ namespace Q2Viewer
 					new ResourceLayoutElementDescription("DiffuseTexture", ResourceKind.TextureReadOnly, ShaderStages.Fragment),
 					new ResourceLayoutElementDescription("DiffuseSampler", ResourceKind.Sampler, ShaderStages.Fragment)
 				));
+			// TODO: Investigate if it's better to unite them into 2d texture array
 			_lightmapLayout = factory.CreateResourceLayout(
 				new ResourceLayoutDescription(
 					new ResourceLayoutElementDescription("LightmapSampler", ResourceKind.Sampler, ShaderStages.Fragment),
