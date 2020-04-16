@@ -21,21 +21,17 @@ namespace Q2Viewer
 
 		public int Size => 2;
 
+		public override bool Equals(object obj)
+		{
+			return obj is LShortValue value &&
+				   Value == value.Value;
+		}
+
+		public override int GetHashCode() => Value;
+
 		public void Read(ReadOnlySpan<byte> bytes)
 		{
 			Value = ReadInt16LittleEndian(bytes);
-		}
-	}
-
-	public struct LUShortValue : ILumpData
-	{
-		public ushort Value;
-
-		public int Size => 2;
-
-		public void Read(ReadOnlySpan<byte> bytes)
-		{
-			Value = ReadUInt16LittleEndian(bytes);
 		}
 	}
 
@@ -44,6 +40,14 @@ namespace Q2Viewer
 		public int Value;
 
 		public int Size => 4;
+
+		public override bool Equals(object obj)
+		{
+			return obj is LIntValue value &&
+				   Value == value.Value;
+		}
+
+		public override int GetHashCode() => Value;
 
 		public void Read(ReadOnlySpan<byte> bytes)
 		{
@@ -57,6 +61,14 @@ namespace Q2Viewer
 
 		public int Size => 4 * 3;
 
+		public override bool Equals(object obj)
+		{
+			return obj is LVertexPosition position &&
+				   Point.Equals(position.Point);
+		}
+
+		public override int GetHashCode() => Point.GetHashCode();
+
 		public void Read(ReadOnlySpan<byte> bytes)
 		{
 			Point = ReadVector3(bytes);
@@ -69,6 +81,15 @@ namespace Q2Viewer
 		public ushort VertexID2;
 
 		public int Size => 4;
+
+		public override bool Equals(object obj)
+		{
+			return obj is LEdge edge &&
+				   VertexID1 == edge.VertexID1 &&
+				   VertexID2 == edge.VertexID2;
+		}
+
+		public override int GetHashCode() => (int)VertexID1 << 16 + (int)VertexID2;
 
 		public void Read(ReadOnlySpan<byte> bytes)
 		{
@@ -94,6 +115,19 @@ namespace Q2Viewer
 		public PlaneType Type;
 
 		public int Size => (4 * 3) + 4 + 4;
+
+		public override bool Equals(object obj)
+		{
+			return obj is LPlane plane &&
+				   Normal.Equals(plane.Normal) &&
+				   Distance == plane.Distance &&
+				   Type == plane.Type;
+		}
+
+		public override int GetHashCode()
+		{
+			return HashCode.Combine(Normal, Distance, Type);
+		}
 
 		public void Read(ReadOnlySpan<byte> bytes)
 		{
@@ -126,6 +160,22 @@ namespace Q2Viewer
 		public int NextTextureInfoId;
 
 		public int Size => (4 * 4) + (4 * 4) + 4 + 4 + 32 + 4;
+
+		public override bool Equals(object obj)
+		{
+			return obj is LTextureInfo info &&
+				   S.Equals(info.S) &&
+				   T.Equals(info.T) &&
+				   Flags == info.Flags &&
+				   Value == info.Value &&
+				   TextureName == info.TextureName &&
+				   NextTextureInfoId == info.NextTextureInfoId;
+		}
+
+		public override int GetHashCode()
+		{
+			return HashCode.Combine(S, T, Flags, Value, TextureName, NextTextureInfoId);
+		}
 
 		public void Read(ReadOnlySpan<byte> bytes)
 		{
@@ -175,6 +225,39 @@ namespace Q2Viewer
 			LightmapStyle3 = bytes[14];
 			LightmapStyle4 = bytes[15];
 			LightOffset = ReadInt32LittleEndian(bytes.Slice(16));
+		}
+
+		public override bool Equals(object obj)
+		{
+			return obj is LFace face &&
+				   PlaneId == face.PlaneId &&
+				   Side == face.Side &&
+				   FirstEdgeId == face.FirstEdgeId &&
+				   EdgeCount == face.EdgeCount &&
+				   TextureInfoId == face.TextureInfoId &&
+				   LightmapStyle1 == face.LightmapStyle1 &&
+				   LightmapStyle2 == face.LightmapStyle2 &&
+				   LightmapStyle3 == face.LightmapStyle3 &&
+				   LightmapStyle4 == face.LightmapStyle4 &&
+				   LightmapStyles == face.LightmapStyles &&
+				   LightOffset == face.LightOffset;
+		}
+
+		public override int GetHashCode()
+		{
+			HashCode hash = new HashCode();
+			hash.Add(PlaneId);
+			hash.Add(Side);
+			hash.Add(FirstEdgeId);
+			hash.Add(EdgeCount);
+			hash.Add(TextureInfoId);
+			hash.Add(LightmapStyle1);
+			hash.Add(LightmapStyle2);
+			hash.Add(LightmapStyle3);
+			hash.Add(LightmapStyle4);
+			hash.Add(LightmapStyles);
+			hash.Add(LightOffset);
+			return hash.ToHashCode();
 		}
 	}
 
@@ -251,6 +334,43 @@ namespace Q2Viewer
 			Contents.HasFlag(ContentFlags.Water) ||
 			Contents.HasFlag(ContentFlags.Lava) ||
 			Contents.HasFlag(ContentFlags.Slime);
+
+		public override bool Equals(object obj)
+		{
+			return obj is LLeaf leaf &&
+				   Contents == leaf.Contents &&
+				   Cluster == leaf.Cluster &&
+				   Area == leaf.Area &&
+				   MinX == leaf.MinX &&
+				   MinY == leaf.MinY &&
+				   MinZ == leaf.MinZ &&
+				   MaxX == leaf.MaxX &&
+				   MaxY == leaf.MaxY &&
+				   MaxZ == leaf.MaxZ &&
+				   FirstLeafFace == leaf.FirstLeafFace &&
+				   NumLeafFaces == leaf.NumLeafFaces &&
+				   FirstLeafBrush == leaf.FirstLeafBrush &&
+				   NumLeafBrushes == leaf.NumLeafBrushes;
+		}
+
+		public override int GetHashCode()
+		{
+			HashCode hash = new HashCode();
+			hash.Add(Contents);
+			hash.Add(Cluster);
+			hash.Add(Area);
+			hash.Add(MinX);
+			hash.Add(MinY);
+			hash.Add(MinZ);
+			hash.Add(MaxX);
+			hash.Add(MaxY);
+			hash.Add(MaxZ);
+			hash.Add(FirstLeafFace);
+			hash.Add(NumLeafFaces);
+			hash.Add(FirstLeafBrush);
+			hash.Add(NumLeafBrushes);
+			return hash.ToHashCode();
+		}
 	}
 
 	public struct LNode : ILumpData
@@ -270,6 +390,39 @@ namespace Q2Viewer
 		public ushort NumFaces;
 
 		public int Size => 4 * 3 + 2 * 6 + 2 * 2;
+
+		public override bool Equals(object obj)
+		{
+			return obj is LNode node &&
+				   PlaneId == node.PlaneId &&
+				   Children1 == node.Children1 &&
+				   Children2 == node.Children2 &&
+				   MinX == node.MinX &&
+				   MinY == node.MinY &&
+				   MinZ == node.MinZ &&
+				   MaxX == node.MaxX &&
+				   MaxY == node.MaxY &&
+				   MaxZ == node.MaxZ &&
+				   FirstFace == node.FirstFace &&
+				   NumFaces == node.NumFaces;
+		}
+
+		public override int GetHashCode()
+		{
+			HashCode hash = new HashCode();
+			hash.Add(PlaneId);
+			hash.Add(Children1);
+			hash.Add(Children2);
+			hash.Add(MinX);
+			hash.Add(MinY);
+			hash.Add(MinZ);
+			hash.Add(MaxX);
+			hash.Add(MaxY);
+			hash.Add(MaxZ);
+			hash.Add(FirstFace);
+			hash.Add(NumFaces);
+			return hash.ToHashCode();
+		}
 
 		public void Read(ReadOnlySpan<byte> bytes)
 		{
@@ -300,6 +453,22 @@ namespace Q2Viewer
 
 		public int Size => (4 * 3) * 3 + 4 + 4 + 4;
 
+		public override bool Equals(object obj)
+		{
+			return obj is LModel model &&
+				   Min.Equals(model.Min) &&
+				   Max.Equals(model.Max) &&
+				   Origin.Equals(model.Origin) &&
+				   HeadNode == model.HeadNode &&
+				   FirstFace == model.FirstFace &&
+				   NumFaces == model.NumFaces;
+		}
+
+		public override int GetHashCode()
+		{
+			return HashCode.Combine(Min, Max, Origin, HeadNode, FirstFace, NumFaces);
+		}
+
 		public void Read(ReadOnlySpan<byte> bytes)
 		{
 			Min = ReadVector3(bytes);
@@ -319,6 +488,19 @@ namespace Q2Viewer
 
 		public int Size => 4 * 3;
 
+		public override bool Equals(object obj)
+		{
+			return obj is LBrush brush &&
+				   FirstSide == brush.FirstSide &&
+				   NumSides == brush.NumSides &&
+				   Contents == brush.Contents;
+		}
+
+		public override int GetHashCode()
+		{
+			return HashCode.Combine(FirstSide, NumSides, Contents);
+		}
+
 		public void Read(ReadOnlySpan<byte> bytes)
 		{
 			FirstSide = ReadInt32LittleEndian(bytes);
@@ -334,6 +516,18 @@ namespace Q2Viewer
 
 		public int Size => 2 * 2;
 
+		public override bool Equals(object obj)
+		{
+			return obj is LBrushSide side &&
+				   PlaneId == side.PlaneId &&
+				   TexInfoId == side.TexInfoId;
+		}
+
+		public override int GetHashCode()
+		{
+			return HashCode.Combine(PlaneId, TexInfoId);
+		}
+
 		public void Read(ReadOnlySpan<byte> bytes)
 		{
 			PlaneId = ReadUInt16LittleEndian(bytes);
@@ -348,6 +542,18 @@ namespace Q2Viewer
 
 		public int Size => 4 * 2;
 
+		public override bool Equals(object obj)
+		{
+			return obj is LArea area &&
+				   NumAreaPortals == area.NumAreaPortals &&
+				   FirstAreaPortal == area.FirstAreaPortal;
+		}
+
+		public override int GetHashCode()
+		{
+			return HashCode.Combine(NumAreaPortals, FirstAreaPortal);
+		}
+
 		public void Read(ReadOnlySpan<byte> bytes)
 		{
 			NumAreaPortals = ReadInt32LittleEndian(bytes);
@@ -361,6 +567,18 @@ namespace Q2Viewer
 		public int OtherArea;
 
 		public int Size => 4 * 2;
+
+		public override bool Equals(object obj)
+		{
+			return obj is LAreaPortal portal &&
+				   PortalId == portal.PortalId &&
+				   OtherArea == portal.OtherArea;
+		}
+
+		public override int GetHashCode()
+		{
+			return HashCode.Combine(PortalId, OtherArea);
+		}
 
 		public void Read(ReadOnlySpan<byte> bytes)
 		{
