@@ -118,18 +118,23 @@ namespace Q2Viewer
 			_cl.UpdateBuffer(_viewBuf, 0, _camera.ViewMatrix);
 			_cl.UpdateBuffer(_projBuf, 0, _camera.ProjectionMatrix);
 
+			var calls = 0;
 			if (_showGizmo)
-				_debugPrimitives.DrawGizmo(_cl);
+			{
+				_debugPrimitives.DrawGizmo(_cl); calls++;
+			}
 
 			if (_showColored)
-				_renderer.DrawDebugModels(_cl, _debugPrimitives);
+				calls += _renderer.DrawDebugModels(_cl, _debugPrimitives);
 			else
-				_renderer.Draw(_cl, _modelRenderer);
+				calls += _renderer.Draw(_cl, _modelRenderer);
 
 			if (_showWireframe)
-				_renderer.DrawWireframe(_cl, _debugPrimitives);
+				calls += _renderer.DrawWireframe(_cl, _debugPrimitives);
 			_cl.End();
 			Graphics.SubmitCommands(_cl);
+
+			Window.Title = $"Q2Viewer (draw calls: {calls})";
 		}
 
 		protected override void AfterDraw(TimeSpan frameTime)

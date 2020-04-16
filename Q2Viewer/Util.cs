@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
@@ -115,5 +116,8 @@ namespace Q2Viewer
 
 		public static RgbaFloat GetRandomColor() =>
 			s_colors[s_rnd.Next(0, s_colors.Count)];
+
+		public static string FormatSW(Stopwatch sw) =>
+			sw.ElapsedMilliseconds > 0 ? $"{sw.ElapsedMilliseconds} ms" : "<1 ms";
 	}
 }

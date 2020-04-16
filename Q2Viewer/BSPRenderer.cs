@@ -5,6 +5,8 @@ using System.Linq;
 using System.Numerics;
 using SharpFileSystem;
 using Veldrid;
+using static Imagini.Logger;
+using static Q2Viewer.Util;
 
 namespace Q2Viewer
 {
@@ -86,32 +88,54 @@ namespace Q2Viewer
 
 		public BSPRenderer(BSPFile file, IArrayAllocator allocator, GraphicsDevice gd, IFileSystem fs)
 		{
+			var sw = new Stopwatch();
 			_file = file;
 			_reader = new BSPReader(file);
 			_allocator = allocator;
 			_gd = gd;
 			_lm = new LightmapAllocator(_gd, _allocator);
 
+			sw.Start();
 			_texPool = new TexturePool(gd, file, fs, allocator);
+			sw.Stop();
+			Log.Debug($"Textures loaded in {FormatSW(sw)}");
 
+			var modelIndex = 0;
 			foreach (var model in _reader.GetModels())
 			{
+				sw.Restart();
 				var mri = BuildModelRenderInfo(model);
+				sw.Stop();
+				Log.Debug($"Model #{modelIndex}: Created {mri.FaceGroupsCount} face groups in {FormatSW(sw)}");
+
 				if (mri.FaceGroupsCount > 0)
+				{
 					_models.Add(mri);
+				}
 
 				// debugging stuff
+				sw.Restart();
 				var mb = BuildDebugModelBuffers(gd, model, out uint count);
+				sw.Stop();
+				Log.Debug($"Model #{modelIndex}: Created debug model in {FormatSW(sw)}");
 				if (mb != null)
 				{
 					_debugModels.Add((mb, count));
-					// continue;
 				}
-				// we got an invisible model - a trigger or something
-				var wf = BuildDebugEdgeBuffer(gd,
-				model, RgbaFloat.Blue, out uint edgeCount);
+
+				sw.Restart();
+				var wf = BuildDebugEdgeBuffer(
+					gd,
+					model,
+					mri.FaceGroupsCount > 0 ? RgbaFloat.Red : RgbaFloat.Blue,
+					out uint edgeCount);
+				sw.Stop();
+				Log.Debug($"Model #{modelIndex}: Created wireframe in {FormatSW(sw)}");
+
 				_wireframes.Add((wf, edgeCount));
+				modelIndex++;
 			}
+			Log.Debug($"Total models: {_models.Count}");
 		}
 
 		private bool IsDrawable(SurfaceFlags flags) =>
@@ -138,7 +162,10 @@ namespace Q2Viewer
 				{
 					ref var face = ref _file.Faces.Data[i];
 					ref var tex = ref _file.TextureInfos.Data[face.TextureInfoId];
-					return (TextureName: tex.TextureName.ToLowerInvariant(), tex.Flags, face.LightmapStyles);
+					return (
+						TextureName: tex.TextureName.ToLowerInvariant(),
+						Flags: tex.Flags,
+						LightmapStyles: face.LightmapStyles);
 				});
 
 			// TODO: Build lightmaps
@@ -296,35 +323,26 @@ namespace Q2Viewer
 			return buffer;
 		}
 
-		public void DrawWireframe(CommandList cl, DebugPrimitives helper)
+		public int DrawWireframe(CommandList cl, DebugPrimitives helper)
 		{
+			var calls = 0;
 			foreach (var (buffer, count) in _wireframes)
+			{
 				helper.DrawLines(cl, Matrix4x4.Identity, buffer, count);
+				calls++;
+			}
+			return calls;
 		}
 
-		public void DrawDebugModels(CommandList cl, DebugPrimitives helper)
+		public int DrawDebugModels(CommandList cl, DebugPrimitives helper)
 		{
+			var calls = 0;
 			foreach (var (vb, count) in _debugModels)
+			{
 				helper.DrawTriangles(cl, Matrix4x4.Identity, vb, count);
-		}
-
-		public void DebugDraw(CommandList cl, DebugPrimitives helper)
-		{
-			foreach (var (vb, count) in _debugModels)
-				helper.DrawTriangles(cl, Matrix4x4.Identity, vb, count);
-			foreach (var (vb, count) in _wireframes)
-				helper.DrawLines(cl, Matrix4x4.Identity, vb, count);
-		}
-
-		public void DebugDrawFrustumCheck(CommandList cl, DebugPrimitives helper)
-		{
-			var matVp = helper.Camera.ViewMatrix * helper.Camera.ProjectionMatrix;
-			foreach (var mri in _models)
-				for (var i = 0; i < mri.FaceGroupsCount; i++)
-				{
-					var aabb = mri.FaceGroups[i].Bounds;
-					helper.DrawAABB(cl, aabb, Util.CheckIfOutside(matVp, aabb));
-				}
+				calls++;
+			}
+			return calls;
 		}
 
 		public int Draw(CommandList cl, ModelRenderer renderer)
