@@ -17,13 +17,21 @@ namespace Q2Viewer
 			new VertexElementDescription("LMCoords", VertexElementSemantic.TextureCoordinate, VertexElementFormat.Float2)
 		);
 
+		private struct CommonShaderParams
+		{
+			public float Gamma;
+			public float Scroll;
+			public float WarpAngle;
+			public float Factor;
+		}
+
 		private readonly GraphicsDevice _device;
 
 		private readonly DeviceBuffer _worldBuffer;
 		private readonly ResourceSet _projViewSet;
 		private readonly ResourceSet _worldParamSet;
+		private readonly DeviceBuffer _commonParamsBuffer;
 		private readonly DeviceBuffer _lmParamsBuffer;
-		private readonly DeviceBuffer _alphaValueBuffer;
 		private readonly ResourceSet _worldAlphaSet;
 		private readonly ResourceLayout _diffuseLayout;
 		private readonly ResourceLayout _lightmapLayout;
@@ -36,8 +44,6 @@ namespace Q2Viewer
 		private readonly Texture _lmFallbackTexture;
 		private readonly Dictionary<Texture, ResourceSet> _textureSets = new Dictionary<Texture, ResourceSet>();
 
-		private static float[] s_transparency33 = new[] { 1f, 1f, 1f, 0.33f };
-		private static float[] s_transparency66 = new[] { 1f, 1f, 1f, 0.66f };
 		private const float s_lightStyleScale = (float)'m' - (float)'a';
 		private const int c_maxLightStyles = 256;
 		private static float[][] s_lightStyles = new[] {
@@ -57,6 +63,11 @@ namespace Q2Viewer
 
 		private long _frame = -1;
 		private float[] _lightStyleValues = new float[c_maxLightStyles];
+
+		private CommonShaderParams _commonParams = new CommonShaderParams()
+		{
+			Gamma = 2.2f,
+		};
 
 		public Camera Camera { get; set; }
 
@@ -78,16 +89,18 @@ namespace Q2Viewer
 			_worldBuffer = factory.CreateBuffer(new BufferDescription(64, BufferUsage.UniformBuffer | BufferUsage.Dynamic));
 			_device.UpdateBuffer(_worldBuffer, 0, Matrix4x4.Identity);
 
-			_lmParamsBuffer = factory.CreateBuffer(new BufferDescription(32, BufferUsage.UniformBuffer | BufferUsage.Dynamic));
+			_commonParamsBuffer = factory.CreateBuffer(new BufferDescription(16, BufferUsage.UniformBuffer | BufferUsage.Dynamic));
+			_device.UpdateBuffer(_commonParamsBuffer, 0, _commonParams);
+
+			_lmParamsBuffer = factory.CreateBuffer(new BufferDescription(16, BufferUsage.UniformBuffer | BufferUsage.Dynamic));
 			_device.UpdateBuffer(_lmParamsBuffer, 0, new Vector4(1, 0, 0, 0));
-			_device.UpdateBuffer(_lmParamsBuffer, 16, 0f);
 
 			var lmShaderSet = new ShaderSetDescription(
 				new[] {
 					s_lmVertexLayout
 				},
 				factory.CreateFromSpirv(
-					new ShaderDescription(ShaderStages.Vertex, Encoding.UTF8.GetBytes(LightmappedVert), "main"),
+					new ShaderDescription(ShaderStages.Vertex, Encoding.UTF8.GetBytes(VertexShader), "main"),
 					new ShaderDescription(ShaderStages.Fragment, Encoding.UTF8.GetBytes(LightmappedFrag), "main")
 				));
 
@@ -96,10 +109,11 @@ namespace Q2Viewer
 						new ResourceLayoutElementDescription("ProjectionBuffer", ResourceKind.UniformBuffer, ShaderStages.Vertex),
 						new ResourceLayoutElementDescription("ViewBuffer", ResourceKind.UniformBuffer, ShaderStages.Vertex)
 					));
-			var worldLayout = factory.CreateResourceLayout(
+			var lmParamsLayout = factory.CreateResourceLayout(
 				new ResourceLayoutDescription(
 					new ResourceLayoutElementDescription("WorldBuffer", ResourceKind.UniformBuffer, ShaderStages.Vertex),
-					new ResourceLayoutElementDescription("ParamsBuffer", ResourceKind.UniformBuffer, ShaderStages.Fragment)
+					new ResourceLayoutElementDescription("ParamsBuffer", ResourceKind.UniformBuffer, ShaderStages.Vertex | ShaderStages.Fragment),
+					new ResourceLayoutElementDescription("LightStylesBuffer", ResourceKind.UniformBuffer, ShaderStages.Vertex | ShaderStages.Fragment)
 				));
 			_diffuseLayout = factory.CreateResourceLayout(
 				new ResourceLayoutDescription(
@@ -119,7 +133,7 @@ namespace Q2Viewer
 				RasterizerStateDescription.Default,
 				PrimitiveTopology.TriangleList,
 				lmShaderSet,
-				new[] { projViewLayout, worldLayout, _diffuseLayout, _lightmapLayout },
+				new[] { projViewLayout, lmParamsLayout, _diffuseLayout, _lightmapLayout },
 				_device.MainSwapchain.Framebuffer.OutputDescription
 			));
 
@@ -129,8 +143,9 @@ namespace Q2Viewer
 				viewBuf));
 
 			_worldParamSet = factory.CreateResourceSet(new ResourceSetDescription(
-				worldLayout,
+				lmParamsLayout,
 				_worldBuffer,
+				_commonParamsBuffer,
 				_lmParamsBuffer
 			));
 
@@ -151,20 +166,19 @@ namespace Q2Viewer
 
 			var worldAlphaLayout = factory.CreateResourceLayout(new ResourceLayoutDescription(
 				new ResourceLayoutElementDescription("WorldBuffer", ResourceKind.UniformBuffer, ShaderStages.Vertex),
-				new ResourceLayoutElementDescription("AlphaValue", ResourceKind.UniformBuffer, ShaderStages.Fragment)
+				new ResourceLayoutElementDescription("ParamsBuffer", ResourceKind.UniformBuffer, ShaderStages.Fragment | ShaderStages.Vertex)
 			));
-			_alphaValueBuffer = factory.CreateBuffer(new BufferDescription(16, BufferUsage.UniformBuffer));
 			_worldAlphaSet = factory.CreateResourceSet(new ResourceSetDescription(
 				worldAlphaLayout,
 				_worldBuffer,
-				_alphaValueBuffer
+				_commonParamsBuffer
 			));
 			var abShaderSet = new ShaderSetDescription(
 				new[] {
 					s_lmVertexLayout
 				},
 				factory.CreateFromSpirv(
-					new ShaderDescription(ShaderStages.Vertex, Encoding.UTF8.GetBytes(AlphaBlendVert), "main"),
+					new ShaderDescription(ShaderStages.Vertex, Encoding.UTF8.GetBytes(VertexShader), "main"),
 					new ShaderDescription(ShaderStages.Fragment, Encoding.UTF8.GetBytes(AlphaBlendFrag), "main")
 				));
 			_alphaBlendPipeline = factory.CreateGraphicsPipeline(new GraphicsPipelineDescription(
@@ -202,7 +216,10 @@ namespace Q2Viewer
 		private float _lmAnimTime = 0f;
 		private const float c_lmFrameTime = 0.01f;
 		private float _texScroll = 0f;
-		private float _texScrollSpeed = 40f / 64f;
+		private const float c_texScrollSpeed = 40f / 64f;
+		private float _texWarp = 0f;
+		private const float c_maxTexWarp = MathF.PI * 2;
+
 		public void Update(float deltaSeconds)
 		{
 			_lmAnimTime += deltaSeconds;
@@ -211,8 +228,10 @@ namespace Q2Viewer
 				_lmAnimTime -= 0.01f;
 				NextLightmapStyleFrame();
 			}
-			_texScroll += deltaSeconds * _texScrollSpeed;
+			_texScroll += deltaSeconds * c_texScrollSpeed;
+			_texWarp += deltaSeconds;
 			if (_texScroll >= 1f) _texScroll -= 1f;
+			if (_texWarp >= c_maxTexWarp) _texWarp -= c_maxTexWarp;
 		}
 
 		private void NextLightmapStyleFrame()
@@ -272,13 +291,16 @@ namespace Q2Viewer
 				CreateLightmapSet(lightmapTex, _lightmapSampler);
 			var lightmapSet = _textureSets[lightmapTex];
 
+			var common = _commonParams;
+			common.Scroll = fg.Flags.HasFlag(SurfaceFlags.Flowing) ? -_texScroll : 0f;
+			common.WarpAngle = fg.Flags.HasFlag(SurfaceFlags.Warp) ? _texWarp : 0f;
+			cl.UpdateBuffer(_commonParamsBuffer, 0, common);
+
 			lightValues[0] = fg.LightmapStyle1 == 255 ? 0 : lightStyles[fg.LightmapStyle1];
 			lightValues[1] = fg.LightmapStyle2 == 255 ? 0 : lightStyles[fg.LightmapStyle2];
 			lightValues[2] = fg.LightmapStyle3 == 255 ? 0 : lightStyles[fg.LightmapStyle3];
 			lightValues[3] = fg.LightmapStyle4 == 255 ? 0 : lightStyles[fg.LightmapStyle4];
 			cl.UpdateBuffer(_lmParamsBuffer, 0, lightValues);
-			var scroll = fg.Flags.HasFlag(SurfaceFlags.Flowing) ? -_texScroll : 0f;
-			cl.UpdateBuffer(_lmParamsBuffer, 16, scroll);
 
 			cl.SetGraphicsResourceSet(0, _projViewSet);
 			cl.SetGraphicsResourceSet(1, _worldParamSet);
@@ -290,7 +312,6 @@ namespace Q2Viewer
 
 		private void DrawAlphaBlended(CommandList cl, ref TexturedFaceGroup fg, ref Matrix4x4 clipMatrix, ref int calls)
 		{
-			var transparency = fg.Flags.HasFlag(SurfaceFlags.Transparent33) ? s_transparency33 : s_transparency66;
 			if (Util.CheckIfOutside(clipMatrix, fg.Bounds))
 				return;
 
@@ -300,7 +321,12 @@ namespace Q2Viewer
 				CreateTextureSet(diffuseTex, _diffuseSampler, _diffuseLayout);
 			var diffuseSet = _textureSets[diffuseTex];
 
-			cl.UpdateBuffer(_alphaValueBuffer, 0, transparency);
+			var common = _commonParams;
+			common.Scroll = fg.Flags.HasFlag(SurfaceFlags.Flowing) ? -_texScroll : 0f;
+			common.WarpAngle = fg.Flags.HasFlag(SurfaceFlags.Warp) ? _texWarp : 0f;
+			common.Factor = fg.Flags.HasFlag(SurfaceFlags.Transparent33) ? 0.33f : 0.66f;
+			cl.UpdateBuffer(_commonParamsBuffer, 0, common);
+
 			cl.SetGraphicsResourceSet(0, _projViewSet);
 			cl.SetGraphicsResourceSet(1, _worldAlphaSet);
 			cl.SetGraphicsResourceSet(2, diffuseSet);
@@ -309,9 +335,7 @@ namespace Q2Viewer
 		}
 
 
-		// TODO: Pass gamma, intensity and overbright as uniforms
-		/* Lightmap shaders */
-		private const string LightmappedVert = @"
+		private const string VertexShader = @"
 #version 450
 layout(set = 0, binding = 0) uniform ProjectionBuffer
 {
@@ -325,16 +349,18 @@ layout(set = 1, binding = 0) uniform WorldBuffer
 {
     mat4 World;
 };
+layout(set = 1, binding = 1) uniform ParamsBuffer
+{
+	float Gamma;
+	float Scroll;
+	float WarpAngle;
+	float Factor;
+};
 layout(location = 0) in vec3 Position;
 layout(location = 1) in vec3 Normal;
 layout(location = 2) in vec2 TexCoords;
 layout(location = 3) in vec2 LMCoords;
 
-layout(set = 1, binding = 1) uniform ParamsBuffer
-{
-	vec4 LightValues;
-	float scroll;
-};
 
 layout(location = 0) out vec2 fsin_texCoords;
 layout(location = 1) out vec2 fsin_lmCoords;
@@ -344,7 +370,12 @@ void main()
     vec4 viewPosition = View * worldPosition;
     vec4 clipPosition = Projection * viewPosition;
     gl_Position = clipPosition;
-    fsin_texCoords = TexCoords + vec2(scroll, 0.0);
+    vec2 tx = TexCoords + vec2(Scroll, 0.0);
+	if (WarpAngle != 0.0) {
+		tx.s += sin(tx.t * 0.125 + WarpAngle) * 0.0625;
+		tx.t -= sin(tx.s * 0.125 + WarpAngle) * 0.0625;
+	}
+	fsin_texCoords = tx;
 	fsin_lmCoords = LMCoords;
 }";
 
@@ -356,8 +387,15 @@ layout(location = 0) out vec4 fsout_color;
 
 layout(set = 1, binding = 1) uniform ParamsBuffer
 {
+	float Gamma;
+	float Scroll;
+	float WarpAngle;
+	float Factor;
+};
+
+layout(set = 1, binding = 2) uniform LightStylesBuffer
+{
 	vec4 LightValues;
-	float scroll;
 };
 
 layout(set = 2, binding = 0) uniform texture2D DiffuseTexture;
@@ -370,7 +408,7 @@ void main()
 {
 	float intensity = 1.5;
 	float overbright = 1.3;
-	vec3 gamma = vec3(1.0 / 2.2);
+	vec3 gamma = vec3(1.0 / Gamma);
 
 	vec3 color = texture(sampler2D(DiffuseTexture, DiffuseSampler), fsin_texCoords).xyz * intensity;
 	vec3 lm1 = texture(sampler2DArray(LightmapTexture, LightmapSampler), vec3(fsin_lmCoords, 0)).rgb * LightValues.x;
@@ -383,43 +421,19 @@ void main()
 	fsout_color = vec4(pow(color * lm, gamma), 1);
 }";
 
-		private const string AlphaBlendVert = @"
-#version 450
-layout(set = 0, binding = 0) uniform ProjectionBuffer
-{
-    mat4 Projection;
-};
-layout(set = 0, binding = 1) uniform ViewBuffer
-{
-    mat4 View;
-};
-layout(set = 1, binding = 0) uniform WorldBuffer
-{
-    mat4 World;
-};
-layout(location = 0) in vec3 Position;
-layout(location = 1) in vec3 Normal;
-layout(location = 2) in vec2 TexCoords;
-
-layout(location = 0) out vec2 fsin_texCoords;
-void main()
-{
-    vec4 worldPosition = World * vec4(Position, 1);
-    vec4 viewPosition = View * worldPosition;
-    vec4 clipPosition = Projection * viewPosition;
-    gl_Position = clipPosition;
-    fsin_texCoords = TexCoords;
-}";
-
 		private const string AlphaBlendFrag = @"
 #version 450
 layout(location = 0) in vec2 fsin_texCoords;
 layout(location = 0) out vec4 fsout_color;
 
-layout(set = 1, binding = 1) uniform AlphaValue
+layout(set = 1, binding = 1) uniform ParamsBuffer
 {
-	vec4 Alpha;
+	float Gamma;
+	float Scroll;
+	float WarpAngle;
+	float Factor;
 };
+
 layout(set = 2, binding = 0) uniform texture2D DiffuseTexture;
 layout(set = 2, binding = 1) uniform sampler DiffuseSampler;
 
@@ -427,9 +441,9 @@ void main()
 {
 	float intensity = 1.5;
 	vec3 color = texture(sampler2D(DiffuseTexture, DiffuseSampler), fsin_texCoords).xyz * intensity;
-	vec3 gamma = vec3(1.0 / 2.2);
+	vec3 gamma = vec3(1.0 / Gamma);
 	vec3 rgb = pow(color, gamma);
-	fsout_color = vec4(rgb, Alpha.w);
+	fsout_color = vec4(rgb, Factor);
 }";
 	}
 }
