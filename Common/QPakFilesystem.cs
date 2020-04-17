@@ -6,6 +6,7 @@ using Microsoft.IO;
 using static System.Buffers.Binary.BinaryPrimitives;
 using static Common.Util;
 using System.Linq;
+using SharpFileSystem.FileSystems;
 
 namespace Common
 {
@@ -171,6 +172,16 @@ namespace Common
 		{
 			CheckDisposed();
 			throw new NotSupportedException();
+		}
+
+		public static IFileSystem MountFilesystem(IEnumerable<string> pakPaths)
+		{
+			if (pakPaths == null || !pakPaths.Any())
+				return new MemoryFileSystem();
+			var paks = pakPaths
+				.Select(System.IO.File.OpenRead)
+				.Select(s => new QPakFS(s));
+			return new MergedFileSystem(paks);
 		}
 	}
 }

@@ -49,7 +49,7 @@ namespace Q2Viewer
 		)
 		{
 			_options = options;
-			_fs = MountFilesystem(options);
+			_fs = QPakFS.MountFilesystem(options.PakPaths);
 			_camera = new Camera(800, 600);
 			this.Resized += (s, e) =>
 			{
@@ -61,16 +61,6 @@ namespace Q2Viewer
 			_camera.Position = new Vector3(25.0f, 15.0f, 25.0f);
 			_camera.Yaw = MathF.PI / 4;
 			_camera.Pitch = -MathF.PI / 8;
-		}
-
-		private IFileSystem MountFilesystem(Options options)
-		{
-			if (options.PakPaths == null || !options.PakPaths.Any())
-				return new MemoryFileSystem();
-			var paks = options.PakPaths
-				.Select(System.IO.File.OpenRead)
-				.Select(s => new QPakFS(s));
-			return new MergedFileSystem(paks);
 		}
 
 		protected override void Initialize()

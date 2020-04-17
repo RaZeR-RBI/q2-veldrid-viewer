@@ -7,7 +7,7 @@ using Veldrid;
 using MB = Imagini.MouseButton;
 
 // taken from mellinoe/veldrid-samples
-namespace Q2Viewer
+namespace Common
 {
 	public class Camera
 	{

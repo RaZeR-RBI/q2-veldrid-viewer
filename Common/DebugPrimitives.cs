@@ -4,7 +4,7 @@ using Common;
 using Veldrid;
 using Veldrid.SPIRV;
 
-namespace Q2Viewer
+namespace Common
 {
 	public class DebugPrimitives
 	{

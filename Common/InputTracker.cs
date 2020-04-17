@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Numerics;
 using Imagini;
 
-namespace Q2Viewer
+namespace Common
 {
 	public static class InputTracker
 	{
