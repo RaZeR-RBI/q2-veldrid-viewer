@@ -1,7 +1,7 @@
 using System;
 using System.Numerics;
 using static System.Buffers.Binary.BinaryPrimitives;
-using static Q2Viewer.Util;
+using static Common.Util;
 
 namespace Q2Viewer
 {

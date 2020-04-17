@@ -6,6 +6,7 @@ using System.Linq;
 using FluentAssertions;
 using SharpFileSystem;
 using System.Text;
+using Common;
 
 namespace Tests
 {

@@ -3,7 +3,7 @@ using System.Diagnostics;
 using System.Numerics;
 using Veldrid;
 
-namespace Q2Viewer
+namespace Common
 {
 	[Flags]
 	public enum SurfaceRenderFlags : int

@@ -4,11 +4,10 @@ using System.IO;
 using SharpFileSystem;
 using Microsoft.IO;
 using static System.Buffers.Binary.BinaryPrimitives;
-using static Q2Viewer.Util;
-using System.Text;
+using static Common.Util;
 using System.Linq;
 
-namespace Q2Viewer
+namespace Common
 {
 	public class QPakFS : IFileSystem
 	{

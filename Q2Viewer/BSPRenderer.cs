@@ -6,7 +6,8 @@ using System.Numerics;
 using SharpFileSystem;
 using Veldrid;
 using static Imagini.Logger;
-using static Q2Viewer.Util;
+using static Common.Util;
+using Common;
 
 namespace Q2Viewer
 {

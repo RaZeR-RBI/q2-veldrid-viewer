@@ -9,12 +9,12 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using Veldrid;
 
-namespace Q2Viewer
+namespace Common
 {
 	public static class Util
 	{
 		// TODO [Optimize] Find a faster way to do frustum culling
-		[MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public static bool CheckIfOutside(Matrix4x4 clipMatrix, AABB worldAABB)
 		{
 			// check if any vertex is inside the viewing frustum

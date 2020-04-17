@@ -5,6 +5,7 @@ using System.Text;
 using System.Linq;
 using Veldrid;
 using Veldrid.SPIRV;
+using static Common.Util;
 
 namespace Q2Viewer
 {
@@ -277,7 +278,7 @@ namespace Q2Viewer
 		private float[] lightValues = new float[4];
 		private void DrawLightmapped(ReadOnlySpan<float> lightStyles, CommandList cl, ref TexturedFaceGroup fg, ref Matrix4x4 clipMatrix, ref int calls)
 		{
-			if (Util.CheckIfOutside(clipMatrix, fg.Bounds))
+			if (CheckIfOutside(clipMatrix, fg.Bounds))
 				return;
 
 			var diffuseTex = fg.Texture;
@@ -312,7 +313,7 @@ namespace Q2Viewer
 
 		private void DrawAlphaBlended(CommandList cl, ref TexturedFaceGroup fg, ref Matrix4x4 clipMatrix, ref int calls)
 		{
-			if (Util.CheckIfOutside(clipMatrix, fg.Bounds))
+			if (CheckIfOutside(clipMatrix, fg.Bounds))
 				return;
 
 			var diffuseTex = fg.Texture;
