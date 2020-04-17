@@ -22,7 +22,7 @@ namespace Q2Viewer
 		private readonly DeviceBuffer _worldBuffer;
 		private readonly ResourceSet _projViewSet;
 		private readonly ResourceSet _worldParamSet;
-		private readonly DeviceBuffer _lightStyleBuffer;
+		private readonly DeviceBuffer _lmParamsBuffer;
 		private readonly DeviceBuffer _alphaValueBuffer;
 		private readonly ResourceSet _worldAlphaSet;
 		private readonly ResourceLayout _diffuseLayout;
@@ -33,7 +33,7 @@ namespace Q2Viewer
 		private readonly Sampler _diffuseSampler;
 		private readonly Sampler _lightmapSampler;
 
-		private readonly Texture _whiteTexture;
+		private readonly Texture _lmFallbackTexture;
 		private readonly Dictionary<Texture, ResourceSet> _textureSets = new Dictionary<Texture, ResourceSet>();
 
 		private static float[] s_transparency33 = new[] { 1f, 1f, 1f, 0.33f };
@@ -70,13 +70,17 @@ namespace Q2Viewer
 			Camera = camera;
 			var factory = _device.ResourceFactory;
 
-			_whiteTexture = TexturePool.CreateWhiteTexture(_device, layers: LightmapAllocator.LightmapsPerFace);
+			_lmFallbackTexture = TexturePool.CreateSingleColorTexture(
+				_device,
+				layers: LightmapAllocator.LightmapsPerFace,
+				new ColorRGBA(20, 20, 20));
 
 			_worldBuffer = factory.CreateBuffer(new BufferDescription(64, BufferUsage.UniformBuffer | BufferUsage.Dynamic));
 			_device.UpdateBuffer(_worldBuffer, 0, Matrix4x4.Identity);
 
-			_lightStyleBuffer = factory.CreateBuffer(new BufferDescription(16, BufferUsage.UniformBuffer | BufferUsage.Dynamic));
-			_device.UpdateBuffer(_lightStyleBuffer, 0, new Vector4(1, 0, 0, 0));
+			_lmParamsBuffer = factory.CreateBuffer(new BufferDescription(32, BufferUsage.UniformBuffer | BufferUsage.Dynamic));
+			_device.UpdateBuffer(_lmParamsBuffer, 0, new Vector4(1, 0, 0, 0));
+			_device.UpdateBuffer(_lmParamsBuffer, 16, 0f);
 
 			var lmShaderSet = new ShaderSetDescription(
 				new[] {
@@ -127,7 +131,7 @@ namespace Q2Viewer
 			_worldParamSet = factory.CreateResourceSet(new ResourceSetDescription(
 				worldLayout,
 				_worldBuffer,
-				_lightStyleBuffer
+				_lmParamsBuffer
 			));
 
 			_diffuseSampler = factory.CreateSampler(new SamplerDescription(
@@ -172,7 +176,7 @@ namespace Q2Viewer
 				new[] { projViewLayout, worldAlphaLayout, _diffuseLayout },
 				_device.MainSwapchain.Framebuffer.OutputDescription
 			));
-			NextAnimationFrame();
+			NextLightmapStyleFrame();
 		}
 
 		private void CreateTextureSet(Texture texture, Sampler sampler, ResourceLayout layout)
@@ -195,7 +199,23 @@ namespace Q2Viewer
 			_textureSets.Add(lightmap, set);
 		}
 
-		public void NextAnimationFrame()
+		private float _lmAnimTime = 0f;
+		private const float c_lmFrameTime = 0.01f;
+		private float _texScroll = 0f;
+		private float _texScrollSpeed = 40f / 64f;
+		public void Update(float deltaSeconds)
+		{
+			_lmAnimTime += deltaSeconds;
+			if (_lmAnimTime >= c_lmFrameTime)
+			{
+				_lmAnimTime -= 0.01f;
+				NextLightmapStyleFrame();
+			}
+			_texScroll += deltaSeconds * _texScrollSpeed;
+			if (_texScroll >= 1f) _texScroll -= 1f;
+		}
+
+		private void NextLightmapStyleFrame()
 		{
 			_frame++;
 			var styleCount = Math.Min(s_lightStyles.GetLength(0), c_maxLightStyles);
@@ -247,7 +267,7 @@ namespace Q2Viewer
 				CreateTextureSet(diffuseTex, _diffuseSampler, _diffuseLayout);
 			var diffuseSet = _textureSets[diffuseTex];
 
-			var lightmapTex = fg.Lightmap ?? _whiteTexture;
+			var lightmapTex = fg.Lightmap ?? _lmFallbackTexture;
 			if (!_textureSets.ContainsKey(lightmapTex))
 				CreateLightmapSet(lightmapTex, _lightmapSampler);
 			var lightmapSet = _textureSets[lightmapTex];
@@ -256,7 +276,9 @@ namespace Q2Viewer
 			lightValues[1] = fg.LightmapStyle2 == 255 ? 0 : lightStyles[fg.LightmapStyle2];
 			lightValues[2] = fg.LightmapStyle3 == 255 ? 0 : lightStyles[fg.LightmapStyle3];
 			lightValues[3] = fg.LightmapStyle4 == 255 ? 0 : lightStyles[fg.LightmapStyle4];
-			cl.UpdateBuffer(_lightStyleBuffer, 0, lightValues);
+			cl.UpdateBuffer(_lmParamsBuffer, 0, lightValues);
+			var scroll = fg.Flags.HasFlag(SurfaceFlags.Flowing) ? -_texScroll : 0f;
+			cl.UpdateBuffer(_lmParamsBuffer, 16, scroll);
 
 			cl.SetGraphicsResourceSet(0, _projViewSet);
 			cl.SetGraphicsResourceSet(1, _worldParamSet);
@@ -287,7 +309,7 @@ namespace Q2Viewer
 		}
 
 
-		// TODO: Pass gamma as uniform
+		// TODO: Pass gamma, intensity and overbright as uniforms
 		/* Lightmap shaders */
 		private const string LightmappedVert = @"
 #version 450
@@ -308,6 +330,12 @@ layout(location = 1) in vec3 Normal;
 layout(location = 2) in vec2 TexCoords;
 layout(location = 3) in vec2 LMCoords;
 
+layout(set = 1, binding = 1) uniform ParamsBuffer
+{
+	vec4 LightValues;
+	float scroll;
+};
+
 layout(location = 0) out vec2 fsin_texCoords;
 layout(location = 1) out vec2 fsin_lmCoords;
 void main()
@@ -316,7 +344,7 @@ void main()
     vec4 viewPosition = View * worldPosition;
     vec4 clipPosition = Projection * viewPosition;
     gl_Position = clipPosition;
-    fsin_texCoords = TexCoords;
+    fsin_texCoords = TexCoords + vec2(scroll, 0.0);
 	fsin_lmCoords = LMCoords;
 }";
 
@@ -329,6 +357,7 @@ layout(location = 0) out vec4 fsout_color;
 layout(set = 1, binding = 1) uniform ParamsBuffer
 {
 	vec4 LightValues;
+	float scroll;
 };
 
 layout(set = 2, binding = 0) uniform texture2D DiffuseTexture;
@@ -339,14 +368,18 @@ layout(set = 3, binding = 1) uniform texture2DArray LightmapTexture;
 
 void main()
 {
-	vec3 color = texture(sampler2D(DiffuseTexture, DiffuseSampler), fsin_texCoords).xyz;
+	float intensity = 1.5;
+	float overbright = 1.3;
+	vec3 gamma = vec3(1.0 / 2.2);
+
+	vec3 color = texture(sampler2D(DiffuseTexture, DiffuseSampler), fsin_texCoords).xyz * intensity;
 	vec3 lm1 = texture(sampler2DArray(LightmapTexture, LightmapSampler), vec3(fsin_lmCoords, 0)).rgb * LightValues.x;
 	vec3 lm2 = texture(sampler2DArray(LightmapTexture, LightmapSampler), vec3(fsin_lmCoords, 1)).rgb * LightValues.y;
 	vec3 lm3 = texture(sampler2DArray(LightmapTexture, LightmapSampler), vec3(fsin_lmCoords, 2)).rgb * LightValues.z;
 	vec3 lm4 = texture(sampler2DArray(LightmapTexture, LightmapSampler), vec3(fsin_lmCoords, 3)).rgb * LightValues.w;
 	vec3 lm = lm1 + lm2 + lm3 + lm4;
+	lm *= overbright;
 
-	vec3 gamma = vec3(1.0 / 2.2);
 	fsout_color = vec4(pow(color * lm, gamma), 1);
 }";
 
@@ -392,10 +425,11 @@ layout(set = 2, binding = 1) uniform sampler DiffuseSampler;
 
 void main()
 {
-	vec4 color = texture(sampler2D(DiffuseTexture, DiffuseSampler), fsin_texCoords);
-	vec4 gamma = vec4(1.0 / 2.2);
-	vec3 rgb = pow(color.xyz, gamma.xyz);
-	fsout_color = vec4(rgb, color.w * Alpha.w);
+	float intensity = 1.5;
+	vec3 color = texture(sampler2D(DiffuseTexture, DiffuseSampler), fsin_texCoords).xyz * intensity;
+	vec3 gamma = vec3(1.0 / 2.2);
+	vec3 rgb = pow(color, gamma);
+	fsout_color = vec4(rgb, Alpha.w);
 }";
 	}
 }

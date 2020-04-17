@@ -87,7 +87,6 @@ namespace Q2Viewer
 			_renderer = new BSPRenderer(bspFile, SharedArrayPoolAllocator.Instance, Graphics, _fs);
 		}
 
-		private float _animTime = 0f;
 		protected override void Update(TimeSpan frameTime)
 		{
 			var deltaSeconds = (float)frameTime.Ticks / TimeSpan.TicksPerSecond;
@@ -100,13 +99,8 @@ namespace Q2Viewer
 			if (InputTracker.IsKeyTriggered(Keycode.NUMBER_3))
 				_showGizmo = !_showGizmo;
 
+			_modelRenderer.Update(deltaSeconds);
 			InputTracker.AfterUpdate();
-			_animTime += deltaSeconds;
-			if (_animTime >= 0.01f)
-			{
-				_animTime -= 0.01f;
-				_modelRenderer.NextAnimationFrame();
-			}
 		}
 
 		protected override void Draw(TimeSpan frameTime)

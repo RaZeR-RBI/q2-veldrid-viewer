@@ -50,10 +50,10 @@ namespace Q2Viewer
 			CreateFallbackTexture();
 		}
 
-		public static Texture CreateWhiteTexture(GraphicsDevice device, uint layers) =>
+		public static Texture CreateSingleColorTexture(GraphicsDevice device, uint layers, ColorRGBA color) =>
 			TexturePool.CreateTexture(device, 1, 1, new ColorRGBA[] {
-				new ColorRGBA(255, 255, 255),
-			}, "_FALLBACK_WHITE", layers);
+				color,
+			}, $"_COLOR_RGBA_{color.R}_{color.G}_{color.B}_{color.A}", layers);
 
 		private bool _isDisposed = false;
 		public void Dispose()
