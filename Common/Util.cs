@@ -55,7 +55,7 @@ namespace Common
 			return encoding.GetString(bytes.Slice(0, length));
 		}
 
-		public static Vector3 ReadVector3(ReadOnlySpan<byte> bytes)
+		public static Vector3 ReadVector3XZY(ReadOnlySpan<byte> bytes)
 		{
 			return new Vector3(
 				BitConverter.ToSingle(bytes.Slice(0)),
@@ -64,12 +64,12 @@ namespace Common
 			);
 		}
 
-		public static Vector3 ReadVector3(MemoryStream ms)
+		public static Vector3 ReadVector3XZY(MemoryStream ms)
 		{
-			Span<byte> vec = stackalloc byte[4 * 3];
-			if (ms.Read(vec) != vec.Length)
+			Span<byte> bytes = stackalloc byte[4 * 3];
+			if (ms.Read(bytes) != bytes.Length)
 				throw new EndOfStreamException("Unexpected end of stream");
-			return ReadVector3(vec);
+			return ReadVector3XZY(bytes);
 		}
 
 		public static Vector4 ReadVector4(ReadOnlySpan<byte> bytes)

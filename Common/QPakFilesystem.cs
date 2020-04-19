@@ -93,8 +93,9 @@ namespace Common
 				var entryOffset = ReadUInt32LittleEndian(entryBytes.Slice(56));
 				var entrySize = ReadUInt32LittleEndian(entryBytes.Slice(60));
 
-				_entries.Add(FileSystemPath.Parse("/" + name),
-							new FileEntry(entryOffset, entrySize));
+				var path = FileSystemPath.Parse("/" + name);
+				if (!_entries.ContainsKey(path)) // workaround for broken PAKs with duplicates
+					_entries.Add(path, new FileEntry(entryOffset, entrySize));
 			}
 		}
 

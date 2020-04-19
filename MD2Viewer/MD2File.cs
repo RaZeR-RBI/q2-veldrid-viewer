@@ -97,8 +97,8 @@ namespace MD2Viewer
 				ms.Write(frameData);
 				ms.Seek(0, SeekOrigin.Begin);
 
-				frame.Scale = ReadVector3(ms);
-				frame.Translate = ReadVector3(ms);
+				frame.Scale = ReadVector3XZY(ms);
+				frame.Translate = ReadVector3XZY(ms);
 
 				Span<byte> name = stackalloc byte[16];
 				if (ms.Read(name) != name.Length)

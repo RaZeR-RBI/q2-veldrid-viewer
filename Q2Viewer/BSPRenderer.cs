@@ -97,7 +97,15 @@ namespace Q2Viewer
 			_lm = new LightmapAllocator(_gd, _allocator);
 
 			sw.Start();
-			_texPool = new TexturePool(gd, file, fs, allocator);
+			_texPool = new TexturePool(gd, fs, allocator);
+			var textureNames = _file.TextureInfos.Data
+				.Where(t => t.TextureName != null)
+				.Select(t => t.TextureName?.ToLowerInvariant())
+				.Distinct();
+
+			foreach (var name in textureNames)
+				_texPool.LoadMapTexture(name);
+
 			sw.Stop();
 			Log.Debug($"Textures loaded in {FormatSW(sw)}");
 

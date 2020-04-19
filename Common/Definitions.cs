@@ -31,7 +31,6 @@ namespace Common
 		public Vector3 Position;
 		public Vector3 Normal;
 		public Vector2 UV;
-		public Vector2 LightmapUV;
 
 		public const int SizeInBytes = 12 * 2 + 8;
 	}

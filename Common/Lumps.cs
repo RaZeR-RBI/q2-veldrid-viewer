@@ -72,7 +72,7 @@ namespace Common
 
 		public void Read(ReadOnlySpan<byte> bytes)
 		{
-			Point = ReadVector3(bytes);
+			Point = ReadVector3XZY(bytes);
 		}
 	}
 
@@ -132,7 +132,7 @@ namespace Common
 
 		public void Read(ReadOnlySpan<byte> bytes)
 		{
-			Normal = ReadVector3(bytes);
+			Normal = ReadVector3XZY(bytes);
 			Distance = BitConverter.ToSingle(bytes.Slice(12));
 			Type = (PlaneType)ReadInt32LittleEndian(bytes.Slice(16));
 		}
@@ -472,9 +472,9 @@ namespace Common
 
 		public void Read(ReadOnlySpan<byte> bytes)
 		{
-			Min = ReadVector3(bytes);
-			Max = ReadVector3(bytes.Slice(12));
-			Origin = ReadVector3(bytes.Slice(24));
+			Min = ReadVector3XZY(bytes);
+			Max = ReadVector3XZY(bytes.Slice(12));
+			Origin = ReadVector3XZY(bytes.Slice(24));
 			HeadNode = ReadInt32LittleEndian(bytes.Slice(36));
 			FirstFace = ReadInt32LittleEndian(bytes.Slice(40));
 			NumFaces = ReadInt32LittleEndian(bytes.Slice(44));

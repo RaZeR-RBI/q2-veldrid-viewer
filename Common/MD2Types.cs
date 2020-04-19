@@ -24,6 +24,8 @@ namespace Common
 
 		public int Size => 2 * 2;
 
+		public Vector2 AsVector2() => new Vector2(S, T);
+
 		public void Read(ReadOnlySpan<byte> bytes)
 		{
 			S = ReadInt16LittleEndian(bytes);
@@ -63,11 +65,13 @@ namespace Common
 
 		public int Size => 4;
 
+		public Vector3 GetPosition() => new Vector3(X, Y, Z);
+
 		public void Read(ReadOnlySpan<byte> bytes)
 		{
 			X = bytes[0];
-			Y = bytes[1];
-			Z = bytes[2];
+			Y = bytes[2];
+			Z = bytes[1];
 			NormalIndex = bytes[3];
 		}
 	}

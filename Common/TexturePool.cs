@@ -7,7 +7,7 @@ using Common;
 using SharpFileSystem;
 using Veldrid;
 
-namespace Q2Viewer
+namespace Common
 {
 	public struct ColorRGBA
 	{
@@ -22,32 +22,19 @@ namespace Q2Viewer
 
 	public class TexturePool : IDisposable
 	{
-		private readonly Dictionary<string, Texture> _textures
+		private readonly Dictionary<string, Texture> _mapTextures
 			= new Dictionary<string, Texture>();
 		private Texture _fallbackTex;
 
 		private readonly List<Texture> _allTextures = new List<Texture>();
 
 		private readonly GraphicsDevice _gd;
-		private readonly BSPFile _bsp;
 		private readonly IArrayAllocator _allocator;
 		private readonly IFileSystem _fs;
 
-		public TexturePool(GraphicsDevice gd, BSPFile file, IFileSystem fs, IArrayAllocator allocator)
+		public TexturePool(GraphicsDevice gd, IFileSystem fs, IArrayAllocator allocator)
 		{
-			(_gd, _bsp, _allocator, _fs) = (gd, file, allocator, fs);
-			var textureNames = file.TextureInfos.Data
-				.Where(t => t.TextureName != null)
-				.Select(t => t.TextureName?.ToLowerInvariant())
-				.Distinct();
-
-			foreach (var name in textureNames)
-			{
-				var texture = LoadTexture(name);
-				if (texture != null)
-					_textures.Add(name, texture);
-			}
-
+			(_gd, _allocator, _fs) = (gd, allocator, fs);
 			CreateFallbackTexture();
 		}
 
@@ -64,18 +51,23 @@ namespace Q2Viewer
 			foreach (var tex in _allTextures)
 				tex.Dispose();
 			_allTextures.Clear();
-			_textures.Clear();
+			_mapTextures.Clear();
 		}
 
 		public Texture GetTexture(string name) =>
-			_textures.ContainsKey(name) ? _textures[name] : _fallbackTex;
+			name == null ?
+				_fallbackTex :
+				_mapTextures.ContainsKey(name) ? _mapTextures[name] : _fallbackTex;
 
-		private Texture LoadTexture(string name)
+		public Texture LoadMapTexture(string name)
 		{
 			var wal = FileSystemPath.Parse($"/textures/{name}.wal");
+			Texture texture = null;
 			if (_fs.Exists(wal))
-				return LoadWAL(wal);
-			return null;
+				texture = LoadWAL(wal);
+			if (texture != null)
+				_mapTextures.Add(name, texture);
+			return texture;
 		}
 
 		private Texture LoadWAL(FileSystemPath path)
@@ -124,7 +116,7 @@ namespace Q2Viewer
 			return texture;
 		}
 
-		private void CreateFallbackTexture()
+		public static Texture CreateFallbackTexture(GraphicsDevice device, IArrayAllocator _allocator)
 		{
 			var O = new ColorRGBA(100, 100, 100);
 			var X = new ColorRGBA(150, 150, 150);
@@ -143,8 +135,12 @@ namespace Q2Viewer
 					pixels[index] = color;
 				}
 
-			_fallbackTex = CreateTexture(size, size, pixels);
+			var result = CreateTexture(device, size, size, pixels);
 			_allocator.Return(pixels);
+			return result;
 		}
+
+		private void CreateFallbackTexture() =>
+			_fallbackTex = CreateFallbackTexture(_gd, _allocator);
 	}
 }

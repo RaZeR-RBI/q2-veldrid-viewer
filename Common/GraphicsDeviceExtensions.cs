@@ -1,7 +1,7 @@
 using System;
 using Veldrid;
 
-namespace Q2Viewer
+namespace Common
 {
 	public static class GraphicsDeviceExtensions
 	{
