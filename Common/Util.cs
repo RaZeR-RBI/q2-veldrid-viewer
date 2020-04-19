@@ -64,6 +64,14 @@ namespace Common
 			);
 		}
 
+		public static Vector3 ReadVector3(MemoryStream ms)
+		{
+			Span<byte> vec = stackalloc byte[4 * 3];
+			if (ms.Read(vec) != vec.Length)
+				throw new EndOfStreamException("Unexpected end of stream");
+			return ReadVector3(vec);
+		}
+
 		public static Vector4 ReadVector4(ReadOnlySpan<byte> bytes)
 		{
 			return new Vector4(

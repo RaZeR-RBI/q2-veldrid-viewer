@@ -1,9 +1,10 @@
 using System;
 using System.Numerics;
+using Common;
 using static System.Buffers.Binary.BinaryPrimitives;
 using static Common.Util;
 
-namespace Q2Viewer
+namespace Common
 {
 	public struct LRawValue : ILumpData
 	{

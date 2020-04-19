@@ -16,10 +16,14 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Q2Viewer\Q2Viewer.csproj" />
+    <ProjectReference Include="..\MD2Viewer\MD2Viewer.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <None Update="box.bsp" CopyToOutputDirectory="PreserveNewest" />
     <None Update="clip.wal" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="infantry.md2" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="skin.pcx" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="pain.pcx" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

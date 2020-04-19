@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using Common;
 using static System.Buffers.Binary.BinaryPrimitives;
 
 namespace Q2Viewer
@@ -103,8 +104,11 @@ namespace Q2Viewer
 			}
 		}
 
+		private bool _isDisposed = false;
 		public void Dispose()
 		{
+			if (_isDisposed) return;
+			_isDisposed = true;
 			Entities.Dispose();
 			Planes.Dispose();
 			Vertexes.Dispose();

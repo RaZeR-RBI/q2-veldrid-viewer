@@ -1,5 +1,5 @@
 All file samples used in tests are taken from free and legal sources.
 
 File list:
-clip.wal - taken from Quake 2 demo (https://archive.org/details/QuakeII_1020)
+clip.wal, infantry.md2 (renamed from monsters/infantry/tris.md2), pain.pcx, skin.pcx - taken from Quake 2 demo (https://archive.org/details/QuakeII_1020)
 box.bsp - created by the original repo author in TrenchBroom

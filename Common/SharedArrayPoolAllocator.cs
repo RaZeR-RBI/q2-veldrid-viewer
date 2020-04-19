@@ -1,6 +1,6 @@
 using System.Buffers;
 
-namespace Q2Viewer
+namespace Common
 {
 	public class SharedArrayPoolAllocator : IArrayAllocator
 	{

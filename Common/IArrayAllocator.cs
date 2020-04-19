@@ -1,4 +1,4 @@
-namespace Q2Viewer
+namespace Common
 {
 	public interface IArrayAllocator
 	{
