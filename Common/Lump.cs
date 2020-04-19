@@ -67,9 +67,9 @@ namespace Common
 			var size = (new T()).Size;
 			if (lengthInBytes % size != 0)
 			{
-				throw new IOException(string.Format(
-					"Invalid lump entry (at {}, size {}), size must be a multiple of {}",
-					stream.Position, lengthInBytes, size));
+				throw new IOException(
+					$"Invalid lump entry (at {stream.Position}, size {lengthInBytes}), size must be a multiple of {size}"
+				);
 			}
 			Length = lengthInBytes / size;
 			Span<byte> buffer = stackalloc byte[size];

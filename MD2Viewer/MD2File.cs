@@ -6,20 +6,26 @@ using static System.Buffers.Binary.BinaryPrimitives;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Numerics;
+using System.Linq;
+using System.Collections.Generic;
 
 namespace MD2Viewer
 {
 	public class MD2File : IDisposable
 	{
+		public readonly int SkinWidth;
+		public readonly int SkinHeight;
+		public readonly int VertexCount;
+
 		public readonly Lump<MD2Skin> Skins;
-		public readonly Lump<MD2Vertex> Vertexes;
 		public readonly Lump<MD2TexCoord> TextureCoords;
 		public readonly Lump<MD2Triangle> Triangles;
 		public readonly Lump<LIntValue> Commands;
 
 		private readonly MD2Vertex[] _frameBackingArray;
 		private readonly MD2Frame[] _frames;
-		private readonly int _frameCount;
+		public int FrameCount { get; private set; }
+		public IEnumerable<MD2Frame> Frames => _frames.Take(FrameCount);
 
 		private readonly IArrayAllocator _allocator;
 
@@ -44,51 +50,51 @@ namespace MD2Viewer
 
 			var offset = 4;
 
-			var skinWidth = ReadIntLE(headerBytes, ref offset);
-			var skinHeight = ReadIntLE(headerBytes, ref offset);
+			SkinWidth = ReadIntLE(headerBytes, ref offset);
+			SkinHeight = ReadIntLE(headerBytes, ref offset);
 			var frameSize = ReadIntLE(headerBytes, ref offset);
 
 			var numSkins = ReadIntLE(headerBytes, ref offset);
-			var numVerts = ReadIntLE(headerBytes, ref offset);
+			VertexCount = ReadIntLE(headerBytes, ref offset);
 			var numTexCoords = ReadIntLE(headerBytes, ref offset);
 			var numTris = ReadIntLE(headerBytes, ref offset);
 			var numCmds = ReadIntLE(headerBytes, ref offset);
-			_frameCount = ReadIntLE(headerBytes, ref offset);
+			FrameCount = ReadIntLE(headerBytes, ref offset);
 
 			var offsetSkins = ReadIntLE(headerBytes, ref offset);
-			var offsetVerts = ReadIntLE(headerBytes, ref offset);
 			var offsetTexCoords = ReadIntLE(headerBytes, ref offset);
 			var offsetTris = ReadIntLE(headerBytes, ref offset);
-			var offsetCmds = ReadIntLE(headerBytes, ref offset);
 			var offsetFrames = ReadIntLE(headerBytes, ref offset);
+			var offsetCmds = ReadIntLE(headerBytes, ref offset);
 
 			Skins = new Lump<MD2Skin>(allocator);
-			Vertexes = new Lump<MD2Vertex>(allocator);
 			TextureCoords = new Lump<MD2TexCoord>(allocator);
 			Triangles = new Lump<MD2Triangle>(allocator);
 			Commands = new Lump<LIntValue>(allocator);
 
 			Skins.Read(stream, offsetSkins, numSkins * default(MD2Skin).Size);
-			Vertexes.Read(stream, offsetVerts, numVerts * default(MD2Vertex).Size);
 			TextureCoords.Read(stream, offsetTexCoords, numTexCoords * default(MD2TexCoord).Size);
 			Triangles.Read(stream, offsetTris, numTris * default(MD2Triangle).Size);
 			Commands.Read(stream, offsetCmds, numCmds * sizeof(int));
 
 			// read frames
-			_frames = _allocator.Rent<MD2Frame>(_frameCount);
-			_frameBackingArray = _allocator.Rent<MD2Vertex>(_frameCount * numVerts);
+			_frames = _allocator.Rent<MD2Frame>(FrameCount);
+			_frameBackingArray = _allocator.Rent<MD2Vertex>(FrameCount * VertexCount);
 			// two vectors, 16 chars of text and numVerts of struct MD2Vertex
-			if (frameSize < 3 * 2 + 16 + default(MD2Vertex).Size * numVerts)
+			if (frameSize < 3 * 2 + 16 + default(MD2Vertex).Size * VertexCount)
 				throw new IOException("Invalid frame size specified");
 			var ms = new MemoryStream(frameSize);
 			stream.Seek(offsetFrames, SeekOrigin.Begin);
-			for (var i = 0; i < _frameCount; i++)
+			for (var i = 0; i < FrameCount; i++)
 			{
 				var frame = new MD2Frame();
-				frame.Vertices = new Memory<MD2Vertex>(_frameBackingArray, i * numVerts, numVerts);
+				frame.Vertices = new Memory<MD2Vertex>(_frameBackingArray, i * VertexCount, VertexCount);
 
+				Span<byte> frameData = stackalloc byte[frameSize];
+				if (stream.Read(frameData) != frameData.Length)
+					throw new EndOfStreamException("Unexpected end of stream");
 				ms.Seek(0, SeekOrigin.Begin);
-				ChunkedStreamRead(stream, ms, frameSize);
+				ms.Write(frameData);
 				ms.Seek(0, SeekOrigin.Begin);
 
 				frame.Scale = ReadVector3(ms);
@@ -99,15 +105,16 @@ namespace MD2Viewer
 					throw new EndOfStreamException("Unexpected end of stream");
 				frame.Name = ReadNullTerminated(name);
 
-				for (var j = 0; j < numVerts; j++)
+				for (var j = 0; j < VertexCount; j++)
 				{
 					Span<byte> vertData = stackalloc byte[4];
 					if (ms.Read(vertData) != vertData.Length)
 						throw new EndOfStreamException("Unexpected end of stream");
 					var vertex = new MD2Vertex();
 					vertex.Read(vertData);
-					_frameBackingArray[i * numVerts + j] = vertex;
+					_frameBackingArray[i * VertexCount + j] = vertex;
 				}
+				_frames[i] = frame;
 			}
 			ms.Dispose();
 		}
@@ -124,7 +131,6 @@ namespace MD2Viewer
 			if (_isDisposed) return;
 			_isDisposed = true;
 			Skins.Dispose();
-			Vertexes.Dispose();
 			TextureCoords.Dispose();
 			Triangles.Dispose();
 			Commands.Dispose();

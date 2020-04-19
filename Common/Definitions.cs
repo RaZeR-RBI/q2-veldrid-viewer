@@ -26,6 +26,16 @@ namespace Common
 		public const int SizeInBytes = 12 * 2 + 8 * 2;
 	}
 
+	public struct VertexNT
+	{
+		public Vector3 Position;
+		public Vector3 Normal;
+		public Vector2 UV;
+		public Vector2 LightmapUV;
+
+		public const int SizeInBytes = 12 * 2 + 8;
+	}
+
 	public struct VertexColor
 	{
 		public Vector3 Position;
