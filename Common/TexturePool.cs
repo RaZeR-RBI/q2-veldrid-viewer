@@ -3,22 +3,13 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Numerics;
 using Common;
 using SharpFileSystem;
 using Veldrid;
 
 namespace Common
 {
-	public struct ColorRGBA
-	{
-		public byte R;
-		public byte G;
-		public byte B;
-		public byte A;
-
-		public ColorRGBA(byte r, byte g, byte b) =>
-			(R, G, B, A) = (r, g, b, 255);
-	}
 
 	public class TexturePool : IDisposable
 	{

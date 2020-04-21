@@ -140,5 +140,12 @@ namespace Common
 
 		public static string FormatSW(Stopwatch sw) =>
 			sw.ElapsedMilliseconds > 0 ? $"{sw.ElapsedMilliseconds} ms" : "<1 ms";
+
+		public static int ClosestPowerOf2(int value)
+		{
+			var result = 1;
+			while (result < value) result *= 2;
+			return result;
+		}
 	}
 }

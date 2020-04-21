@@ -23,6 +23,7 @@ namespace MD2Viewer
 
 		private readonly DeviceBuffer _worldBuffer;
 		private readonly DeviceBuffer _worldITBuffer;
+		private readonly DeviceBuffer _paramsBuffer;
 		private readonly ResourceSet _projViewSet;
 		private readonly ResourceSet _worldParamSet;
 		private readonly Pipeline _pipeline;
@@ -45,6 +46,26 @@ namespace MD2Viewer
 			new VertexElementDescription("TexCoords", VertexElementSemantic.TextureCoordinate, VertexElementFormat.Float2)
 		);
 
+		private static readonly VertexLayoutDescription s_vatVertexLayout = new VertexLayoutDescription(
+			new VertexElementDescription("Index", VertexElementSemantic.TextureCoordinate, VertexElementFormat.Int1),
+			new VertexElementDescription("TexCoords", VertexElementSemantic.TextureCoordinate, VertexElementFormat.Float2)
+		);
+
+		private readonly Texture _vatPositionTex;
+		private readonly Texture _vatNormalTex;
+		private readonly VATDescription[] _vatFrames;
+
+		private struct ShaderParameters
+		{
+			public Vector4 HalfPixel;
+			public Vector4 Time;
+			public Vector4 Translate;
+			public Vector4 Scale;
+		}
+
+		private ShaderParameters _shaderParams = new ShaderParameters();
+		private readonly ResourceSet _vatSet;
+
 		public MD2Renderer(
 			GraphicsDevice gd,
 			IFileSystem fileSystem,
@@ -62,6 +83,7 @@ namespace MD2Viewer
 			var rf = _gd.ResourceFactory;
 			_worldBuffer = rf.CreateBuffer(new BufferDescription(64, BufferUsage.UniformBuffer | BufferUsage.Dynamic));
 			_worldITBuffer = rf.CreateBuffer(new BufferDescription(64, BufferUsage.UniformBuffer | BufferUsage.Dynamic));
+			_paramsBuffer = rf.CreateBuffer(new BufferDescription(64, BufferUsage.UniformBuffer | BufferUsage.Dynamic));
 
 			_gd.UpdateBuffer(_worldBuffer, 0, Matrix4x4.Identity);
 			Matrix4x4.Invert(Matrix4x4.Identity, out Matrix4x4 worldInverted);
@@ -69,18 +91,36 @@ namespace MD2Viewer
 
 			// TODO: Pack frame data into texture and use it for animation
 			_vertexCount = (uint)File.Triangles.Length * 3;
+			var frame = Reader.GetFrames().First();
+#if false
 			_vertices = rf.CreateBuffer(new BufferDescription(
 				_vertexCount * VertexNT.SizeInBytes, BufferUsage.VertexBuffer
 			));
-			var frame = Reader.GetFrames().First();
 			Reader.ProcessFrame(frame, (name, data) =>
 			{
 				_gd.UpdateBuffer(_vertices, data);
 			});
 
+#else
+			_vertices = rf.CreateBuffer(new BufferDescription(
+				_vertexCount * VATVertex.SizeInBytes, BufferUsage.VertexBuffer
+			));
+			var vertData = allocator.Rent<VATVertex>((int)_vertexCount);
+			Reader.ProcessFrame(frame, (name, data) =>
+			{
+				for (var i = 0; i < _vertexCount; i++)
+					vertData[i] = new VATVertex()
+					{
+						Index = i,
+						UV = data[i].UV
+					};
+			});
+			_gd.UpdateBuffer(_vertices, vertData, _vertexCount, VATVertex.SizeInBytes);
+#endif
 			var shaderSet = new ShaderSetDescription(
 				new[] {
-					s_ntVertexLayout
+					// s_ntVertexLayout
+					s_vatVertexLayout
 				},
 				rf.CreateFromSpirv(
 					new ShaderDescription(ShaderStages.Vertex, Encoding.UTF8.GetBytes(VertexShader), "main"),
@@ -95,12 +135,19 @@ namespace MD2Viewer
 			var worldLayout = rf.CreateResourceLayout(
 				new ResourceLayoutDescription(
 					new ResourceLayoutElementDescription("WorldBuffer", ResourceKind.UniformBuffer, ShaderStages.Vertex),
-					new ResourceLayoutElementDescription("WorldITBuffer", ResourceKind.UniformBuffer, ShaderStages.Vertex)
+					new ResourceLayoutElementDescription("WorldITBuffer", ResourceKind.UniformBuffer, ShaderStages.Vertex),
+					new ResourceLayoutElementDescription("ParamsBuffer", ResourceKind.UniformBuffer, ShaderStages.Vertex)
 				));
 			var diffuseLayout = rf.CreateResourceLayout(
 				new ResourceLayoutDescription(
 					new ResourceLayoutElementDescription("DiffuseTexture", ResourceKind.TextureReadOnly, ShaderStages.Fragment),
 					new ResourceLayoutElementDescription("DiffuseSampler", ResourceKind.Sampler, ShaderStages.Fragment)
+				));
+			var vatLayout = rf.CreateResourceLayout(
+				new ResourceLayoutDescription(
+					new ResourceLayoutElementDescription("VATPositionTexture", ResourceKind.TextureReadOnly, ShaderStages.Vertex),
+					new ResourceLayoutElementDescription("VATNormalTexture", ResourceKind.TextureReadOnly, ShaderStages.Vertex),
+					new ResourceLayoutElementDescription("VATSampler", ResourceKind.Sampler, ShaderStages.Vertex)
 				));
 
 			_pipeline = rf.CreateGraphicsPipeline(new GraphicsPipelineDescription(
@@ -109,7 +156,7 @@ namespace MD2Viewer
 				RasterizerStateDescription.Default,
 				PrimitiveTopology.TriangleList,
 				shaderSet,
-				new[] { projViewLayout, worldLayout, diffuseLayout },
+				new[] { projViewLayout, worldLayout, diffuseLayout, vatLayout },
 				_gd.MainSwapchain.Framebuffer.OutputDescription
 			));
 
@@ -121,7 +168,8 @@ namespace MD2Viewer
 			_worldParamSet = rf.CreateResourceSet(new ResourceSetDescription(
 				worldLayout,
 				_worldBuffer,
-				_worldITBuffer
+				_worldITBuffer,
+				_paramsBuffer
 			));
 
 			_texPool = new TexturePool(gd, fileSystem, allocator);
@@ -138,6 +186,38 @@ namespace MD2Viewer
 			}
 			if (_diffuseTextures.Count == 0)
 				_diffuseTextures.Add(CreateTextureSet(_texPool.GetTexture(null), diffuseLayout));
+
+			_vatFrames = VertexAnimationTexture.CreateVAT(
+				_gd,
+				Reader,
+				allocator,
+				out _vatPositionTex,
+				out _vatNormalTex,
+				out Vector3 translate,
+				out Vector3 scale
+			);
+			_shaderParams.Translate = new Vector4(translate, 0);
+			_shaderParams.Scale = new Vector4(scale, 1);
+			_shaderParams.HalfPixel = new Vector4(0.5f, 0.5f, 0f, 0f) / new Vector4(_vatPositionTex.Width, _vatPositionTex.Height, 1f, 1f);
+			_shaderParams.Time = Vector4.Zero;
+
+			_gd.UpdateBuffer(_paramsBuffer, 0, _shaderParams);
+			_vatSet = rf.CreateResourceSet(new ResourceSetDescription(
+				vatLayout,
+				_vatPositionTex,
+				_vatNormalTex,
+				_gd.LinearSampler
+			));
+		}
+
+		public void Update(float deltaSeconds)
+		{
+			var maxTime = (float)File.FrameCount * 0.1f;
+			var step = 1f / maxTime;
+			var time = _shaderParams.Time.X + step * deltaSeconds;
+			if (time > 1.0f) time -= 1.0f;
+			_shaderParams.Time = new Vector4(time, 0f, 0f, 0f);
+			_gd.UpdateBuffer(_paramsBuffer, 0, _shaderParams);
 		}
 
 		public void Draw(CommandList cl, Matrix4x4 worldMatrix)
@@ -151,6 +231,7 @@ namespace MD2Viewer
 			cl.SetGraphicsResourceSet(0, _projViewSet);
 			cl.SetGraphicsResourceSet(1, _worldParamSet);
 			cl.SetGraphicsResourceSet(2, _diffuseTextures[SelectedSkin]);
+			cl.SetGraphicsResourceSet(3, _vatSet);
 			cl.Draw(_vertexCount);
 		}
 
@@ -179,20 +260,39 @@ layout(set = 1, binding = 1) uniform WorldITBuffer
 {
     mat4 WorldInverseTranspose;
 };
-layout(location = 0) in vec3 Position;
-layout(location = 1) in vec3 Normal;
-layout(location = 2) in vec2 TexCoords;
+layout(set = 1, binding = 2) uniform ParamsBuffer
+{
+    vec4 HalfPixel;
+    vec4 Time;
+    vec4 Translate;
+    vec4 Scale;
+};
+
+layout(set = 3, binding = 0) uniform texture2D VATPositionTexture;
+layout(set = 3, binding = 1) uniform texture2D VATNormalTexture;
+layout(set = 3, binding = 2) uniform sampler VATSampler;
+
+
+layout(location = 0) in int Index;
+layout(location = 1) in vec2 TexCoords;
 
 layout(location = 0) out vec2 fsin_texCoords;
 layout(location = 1) out vec3 fsin_normal;
 void main()
 {
-    vec4 worldPosition = World * vec4(Position, 1);
+	vec2 hp = HalfPixel.xy;
+	vec2 vatCoords = vec2(Index * (hp.x * 2.0) + hp.x, Time.x + hp.y);
+	vec3 texPosition = textureLod(sampler2D(VATPositionTexture, VATSampler), vatCoords, 0).xyz;
+	texPosition *= Scale.xyz;
+	texPosition += Translate.xyz;
+
+    vec4 worldPosition = World * vec4(texPosition, 1);
     vec4 viewPosition = View * worldPosition;
     vec4 clipPosition = Projection * viewPosition;
+	vec3 texNormal = textureLod(sampler2D(VATNormalTexture, VATSampler), vatCoords, 0).xyz;
     gl_Position = clipPosition;
 	fsin_texCoords = TexCoords;
-    fsin_normal = normalize(mat3(WorldInverseTranspose) * Normal);
+    fsin_normal = normalize(mat3(WorldInverseTranspose) * texNormal);
 }";
 
 		private const string FragmentShader = @"
@@ -216,6 +316,7 @@ void main()
     float light = clamp(dot(fsin_normal, lightDir), 0.3, 1.0);
 
 	fsout_color = vec4(rgb * light, 1.0);
+	// fsout_color = vec4(fsin_normal / 2.0 + vec3(1.0), 1.0);
 }";
 	}
 }

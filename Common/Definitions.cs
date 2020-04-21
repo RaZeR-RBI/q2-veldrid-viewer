@@ -46,6 +46,14 @@ namespace Common
 			(Position, Color) = (pos, new Vector3(clr.R, clr.G, clr.B));
 	}
 
+	public struct VATVertex
+	{
+		public int Index;
+		public Vector2 UV;
+
+		public const uint SizeInBytes = 4 + 4 * 2;
+	}
+
 	public struct AABB
 	{
 		public Vector3 Min;
@@ -102,5 +110,40 @@ namespace Common
 
 		public static explicit operator Vector2(Vector2i v) =>
 			new Vector2((float)v.X, (float)v.Y);
+	}
+
+	public struct ColorRGBA
+	{
+		public byte R;
+		public byte G;
+		public byte B;
+		public byte A;
+
+		public ColorRGBA(byte r, byte g, byte b) =>
+			(R, G, B, A) = (r, g, b, 255);
+
+		public ColorRGBA(Vector3 normalized) =>
+			(R, G, B, A) = (
+				(byte)(normalized.X * 255f),
+				(byte)(normalized.Y * 255f),
+				(byte)(normalized.Z * 255f),
+				 255);
+	}
+
+	public struct ColorRGBA16
+	{
+		public ushort R;
+		public ushort G;
+		public ushort B;
+		public ushort A;
+
+		private const float c_max = (float)ushort.MaxValue;
+
+		public ColorRGBA16(Vector3 normalized) =>
+			(R, G, B, A) = (
+				(ushort)(normalized.X * c_max),
+				(ushort)(normalized.Y * c_max),
+				(ushort)(normalized.Z * c_max),
+				 ushort.MaxValue);
 	}
 }
