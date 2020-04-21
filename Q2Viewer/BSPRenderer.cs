@@ -177,7 +177,6 @@ namespace Q2Viewer
 						LightmapStyles: face.LightmapStyles);
 				});
 
-			// TODO: Build lightmaps
 			var mri = new ModelRenderInfo();
 			mri.FaceGroupsCount = grouping.Count();
 			mri.FaceGroups = _allocator.Rent<TexturedFaceGroup>(mri.FaceGroupsCount);
@@ -212,7 +211,6 @@ namespace Q2Viewer
 						var vertex = entry.Value;
 						vertex.UV.X /= tfg.Texture.Width;
 						vertex.UV.Y /= tfg.Texture.Height;
-						// TODO: Adjust the lightmap coordinates
 						vertices[offset] = vertex;
 						offset++;
 					}

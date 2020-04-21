@@ -95,7 +95,7 @@ namespace MD2Viewer
 				});
 			}
 			positionTex = CreateTexture(gd, vertexCount, frameCount, ppix, PixelFormat.R16_G16_B16_A16_UNorm);
-			normalTex = CreateTexture(gd, vertexCount, frameCount, npix, PixelFormat.R8_G8_B8_A8_SNorm);
+			normalTex = CreateTexture(gd, vertexCount, frameCount, npix, PixelFormat.R8_G8_B8_A8_UNorm);
 			return result;
 		}
 

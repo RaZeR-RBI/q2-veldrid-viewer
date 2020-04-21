@@ -290,6 +290,8 @@ void main()
     vec4 viewPosition = View * worldPosition;
     vec4 clipPosition = Projection * viewPosition;
 	vec3 texNormal = textureLod(sampler2D(VATNormalTexture, VATSampler), vatCoords, 0).xyz;
+	texNormal *= 2.0;
+	texNormal -= vec3(1.0);
     gl_Position = clipPosition;
 	fsin_texCoords = TexCoords;
     fsin_normal = normalize(mat3(WorldInverseTranspose) * texNormal);
@@ -316,7 +318,6 @@ void main()
     float light = clamp(dot(fsin_normal, lightDir), 0.3, 1.0);
 
 	fsout_color = vec4(rgb * light, 1.0);
-	// fsout_color = vec4(fsin_normal / 2.0 + vec3(1.0), 1.0);
 }";
 	}
 }
