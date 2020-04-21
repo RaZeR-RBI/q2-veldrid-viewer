@@ -76,6 +76,11 @@ namespace MD2Viewer
 			var deltaSeconds = (float)frameTime.Ticks / TimeSpan.TicksPerSecond;
 			_camera.Update(deltaSeconds);
 
+			if (InputTracker.IsKeyTriggered(Keycode.m))
+				_renderer.SelectedSkin++;
+			if (InputTracker.IsKeyTriggered(Keycode.n))
+				_renderer.SelectedSkin--;
+
 			InputTracker.AfterUpdate();
 		}
 

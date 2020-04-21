@@ -70,6 +70,34 @@ namespace Common
 			return texture;
 		}
 
+		public Texture LoadAbsolute(string path)
+		{
+			Texture texture = null;
+			var f = FileSystemPath.Parse('/' + path.TrimStart('/'));
+			if (_fs.Exists(f) && path.EndsWith(".pcx"))
+				texture = LoadPCX(f);
+
+			if (texture != null)
+				_allTextures.Add(texture);
+			return texture;
+		}
+
+		private Texture LoadPCX(FileSystemPath path)
+		{
+			var file = _fs.OpenFile(path, FileAccess.Read);
+			var pcxTex = PCXReader.ReadPCX(file, _allocator);
+			var pixelCount = pcxTex.Width * pcxTex.Height;
+			var palette = pcxTex.Palette;
+			var pixels = _allocator.Rent<ColorRGBA>(pixelCount);
+			var indexes = pcxTex.Pixels;
+			for (var i = 0; i < pixelCount; i++)
+				pixels[i] = palette[indexes[i]];
+			var texture = CreateTexture(pcxTex.Width, pcxTex.Height, pixels, path.ToString());
+			_allocator.Return(pixels);
+			pcxTex.DisposePixelData();
+			return texture;
+		}
+
 		private Texture LoadWAL(FileSystemPath path)
 		{
 			var file = _fs.OpenFile(path, FileAccess.Read);
@@ -81,6 +109,7 @@ namespace Common
 				pixels[i] = QuakePalette.Colors[indexes[i]];
 			var texture = CreateTexture(walTex.Width, walTex.Height, pixels, path.ToString());
 			_allocator.Return(pixels);
+			walTex.DisposePixelData();
 			return texture;
 		}
 

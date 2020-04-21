@@ -6,6 +6,7 @@ using Common;
 using SharpFileSystem;
 using Veldrid;
 using Veldrid.SPIRV;
+using static Imagini.Logger;
 
 namespace MD2Viewer
 {
@@ -26,7 +27,17 @@ namespace MD2Viewer
 		private readonly ResourceSet _worldParamSet;
 		private readonly Pipeline _pipeline;
 		private readonly List<ResourceSet> _diffuseTextures = new List<ResourceSet>();
+
 		private int _selectedSkin = 0;
+		public int SkinCount => _diffuseTextures.Count;
+		public int SelectedSkin
+		{
+			get => _selectedSkin;
+			set
+			{
+				_selectedSkin = value % SkinCount;
+			}
+		}
 
 		private static readonly VertexLayoutDescription s_ntVertexLayout = new VertexLayoutDescription(
 			new VertexElementDescription("Position", VertexElementSemantic.Position, VertexElementFormat.Float3),
@@ -113,9 +124,20 @@ namespace MD2Viewer
 				_worldITBuffer
 			));
 
-			// TODO: Try to find the needed skin textures
 			_texPool = new TexturePool(gd, fileSystem, allocator);
-			_diffuseTextures.Add(CreateTextureSet(_texPool.GetTexture(null), diffuseLayout));
+			for (var i = 0; i < file.Skins.Length; i++)
+			{
+				var path = file.Skins.Data[i].Path;
+				var skinTex = _texPool.LoadAbsolute(path);
+				if (skinTex == null)
+				{
+					Log.Warning($"Unable to load texture '{path}'");
+					continue;
+				}
+				_diffuseTextures.Add(CreateTextureSet(skinTex, diffuseLayout));
+			}
+			if (_diffuseTextures.Count == 0)
+				_diffuseTextures.Add(CreateTextureSet(_texPool.GetTexture(null), diffuseLayout));
 		}
 
 		public void Draw(CommandList cl, Matrix4x4 worldMatrix)
@@ -128,7 +150,7 @@ namespace MD2Viewer
 
 			cl.SetGraphicsResourceSet(0, _projViewSet);
 			cl.SetGraphicsResourceSet(1, _worldParamSet);
-			cl.SetGraphicsResourceSet(2, _diffuseTextures[_selectedSkin]);
+			cl.SetGraphicsResourceSet(2, _diffuseTextures[SelectedSkin]);
 			cl.Draw(_vertexCount);
 		}
 
