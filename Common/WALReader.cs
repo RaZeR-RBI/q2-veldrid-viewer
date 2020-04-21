@@ -24,11 +24,30 @@ namespace Common
 		public WALMipData[] Mips;
 		public int MipCount;
 
-		public void DisposePixelData(IArrayAllocator allocator)
+		private IArrayAllocator _allocator;
+
+		public WALTexture(string name, int width, int height, string nextFrameName, uint flags, uint contents, uint value, WALMipData[] mips, int mipCount, IArrayAllocator allocator)
+		{
+			Name = name;
+			Width = width;
+			Height = height;
+			NextFrameName = nextFrameName;
+			Flags = flags;
+			Contents = contents;
+			Value = value;
+			Mips = mips;
+			MipCount = mipCount;
+			_allocator = allocator;
+		}
+
+		public void DisposePixelData()
 		{
 			for (var i = 0; i < MipCount; i++)
-				allocator.Return(Mips[i].Pixels);
-			allocator.Return(Mips);
+			{
+				_allocator.Return(Mips[i].Pixels);
+				Mips[i].Pixels = null;
+			}
+			_allocator.Return(Mips);
 			Mips = null;
 		}
 	}
@@ -42,8 +61,7 @@ namespace Common
 			if (!stream.CanRead || !stream.CanSeek)
 				throw new ArgumentException("Supplied stream must be seekable and readable", nameof(stream));
 			Span<byte> headerBytes = stackalloc byte[100];
-			if (stream.Read(headerBytes) < 100)
-				throw new EndOfStreamException("Unexpected end of stream while reading header");
+			EnsureRead(stream, headerBytes);
 			var name = ReadNullTerminated(headerBytes.Slice(0, 32));
 			var width = ReadInt32LittleEndian(headerBytes.Slice(32, 4));
 			var height = ReadInt32LittleEndian(headerBytes.Slice(36, 4));
@@ -77,17 +95,18 @@ namespace Common
 				if (expectedSize <= 1) expectedSize = 1;
 			}
 
-			return new WALTexture()
-			{
-				Name = name,
-				Width = width,
-				Height = height,
-				NextFrameName = animname,
-				Flags = flags,
-				Contents = contents,
-				Value = value,
-				Mips = mips
-			};
+			return new WALTexture(
+				name,
+				width,
+				height,
+				animname,
+				flags,
+				contents,
+				value,
+				mips,
+				MipCount,
+				allocator
+			);
 		}
 	}
 }

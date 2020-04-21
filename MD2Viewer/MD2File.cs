@@ -35,8 +35,7 @@ namespace MD2Viewer
 		{
 			_allocator = allocator;
 			Span<byte> headerBytes = stackalloc byte[HeaderSize];
-			if (stream.Read(headerBytes) < HeaderSize)
-				throw new EndOfStreamException("Unexpected end of stream while reading header");
+			EnsureRead(stream, headerBytes);
 			if (headerBytes[0] != (byte)'I' ||
 				headerBytes[1] != (byte)'D' ||
 				headerBytes[2] != (byte)'P' ||
@@ -91,8 +90,7 @@ namespace MD2Viewer
 				frame.Vertices = new Memory<MD2Vertex>(_frameBackingArray, i * VertexCount, VertexCount);
 
 				Span<byte> frameData = stackalloc byte[frameSize];
-				if (stream.Read(frameData) != frameData.Length)
-					throw new EndOfStreamException("Unexpected end of stream");
+				EnsureRead(stream, frameData);
 				ms.Seek(0, SeekOrigin.Begin);
 				ms.Write(frameData);
 				ms.Seek(0, SeekOrigin.Begin);
@@ -101,15 +99,13 @@ namespace MD2Viewer
 				frame.Translate = ReadVector3XZY(ms);
 
 				Span<byte> name = stackalloc byte[16];
-				if (ms.Read(name) != name.Length)
-					throw new EndOfStreamException("Unexpected end of stream");
+				EnsureRead(ms, name);
 				frame.Name = ReadNullTerminated(name);
 
 				for (var j = 0; j < VertexCount; j++)
 				{
 					Span<byte> vertData = stackalloc byte[4];
-					if (ms.Read(vertData) != vertData.Length)
-						throw new EndOfStreamException("Unexpected end of stream");
+					EnsureRead(ms, vertData);
 					var vertex = new MD2Vertex();
 					vertex.Read(vertData);
 					_frameBackingArray[i * VertexCount + j] = vertex;

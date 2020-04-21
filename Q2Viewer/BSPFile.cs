@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using Common;
+using static Common.Util;
 using static System.Buffers.Binary.BinaryPrimitives;
 
 namespace Q2Viewer
@@ -36,8 +37,7 @@ namespace Q2Viewer
 		public BSPFile(Stream stream, IArrayAllocator allocator)
 		{
 			Span<byte> headerBytes = stackalloc byte[HeaderSize];
-			if (stream.Read(headerBytes) < HeaderSize)
-				throw new EndOfStreamException("Unexpected end of stream while reading header");
+			EnsureRead(stream, headerBytes);
 			if (headerBytes[0] != (byte)'I' ||
 				headerBytes[1] != (byte)'B' ||
 				headerBytes[2] != (byte)'S' ||

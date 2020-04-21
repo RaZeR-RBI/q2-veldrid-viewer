@@ -67,8 +67,7 @@ namespace Common
 		public static Vector3 ReadVector3XZY(MemoryStream ms)
 		{
 			Span<byte> bytes = stackalloc byte[4 * 3];
-			if (ms.Read(bytes) != bytes.Length)
-				throw new EndOfStreamException("Unexpected end of stream");
+			EnsureRead(ms, bytes);
 			return ReadVector3XZY(bytes);
 		}
 
@@ -102,6 +101,20 @@ namespace Common
 				}
 				curOffset += chunkSize;
 			}
+		}
+
+		public static void EnsureRead(Stream stream, Span<byte> target)
+		{
+			if (stream.Read(target) != target.Length)
+				throw new EndOfStreamException("Unexpected end of stream");
+		}
+
+		public static byte EnsureReadByte(Stream stream)
+		{
+			var result = stream.ReadByte();
+			if (result < 0)
+				throw new EndOfStreamException("Unexpected end of stream");
+			return (byte)result;
 		}
 
 		public static RgbaFloat ToRgbaFloat(this Color color) =>

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using static Common.Util;
 
 namespace Common
 {
@@ -76,8 +77,7 @@ namespace Common
 			_data = _allocator.Rent<T>(Length);
 			for (int i = 0; i < Length; i++)
 			{
-				if (stream.Read(buffer) < size)
-					throw new EndOfStreamException("Unexpected end of stream while reading lump");
+				EnsureRead(stream, buffer);
 				var item = new T();
 				item.Read(buffer);
 				_data[i] = item;
