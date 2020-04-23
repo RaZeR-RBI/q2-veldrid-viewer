@@ -16,6 +16,13 @@ namespace Common
 		IsUnderwater = 0x80
 	}
 
+	public struct VertexPosition
+	{
+		public Vector3 Position;
+
+		public const int SizeInBytes = 12;
+	}
+
 	public struct VertexNTL
 	{
 		public Vector3 Position;

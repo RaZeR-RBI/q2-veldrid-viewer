@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
@@ -29,10 +30,10 @@ namespace Common
 			CreateFallbackTexture();
 		}
 
-		public static Texture CreateSingleColorTexture(GraphicsDevice device, uint layers, ColorRGBA color) =>
+		public static Texture CreateSingleColorTexture(GraphicsDevice device, uint layers, ColorRGBA color, TextureUsage usageFlags = 0) =>
 			TexturePool.CreateTexture(device, 1, 1, new ColorRGBA[] {
 				color,
-			}, $"_COLOR_RGBA_{color.R}_{color.G}_{color.B}_{color.A}", layers);
+			}, $"_COLOR_RGBA_{color.R}_{color.G}_{color.B}_{color.A}", layers, usageFlags);
 
 		private bool _isDisposed = false;
 		public void Dispose()
@@ -86,6 +87,7 @@ namespace Common
 			var texture = CreateTexture(pcxTex.Width, pcxTex.Height, pixels, path.ToString());
 			_allocator.Return(pixels);
 			pcxTex.DisposePixelData();
+			file.Close();
 			return texture;
 		}
 
@@ -101,6 +103,7 @@ namespace Common
 			var texture = CreateTexture(walTex.Width, walTex.Height, pixels, path.ToString());
 			_allocator.Return(pixels);
 			walTex.DisposePixelData();
+			file.Close();
 			return texture;
 		}
 
@@ -111,11 +114,12 @@ namespace Common
 			return texture;
 		}
 
-		public static Texture CreateTexture(GraphicsDevice device, int width, int height, ColorRGBA[] pixels, string name = null, uint layers = 1)
+		public static Texture CreateTexture(GraphicsDevice device, int width, int height, ColorRGBA[] pixels, string name = null, uint layers = 1, TextureUsage usageFlags = 0)
 		{
 			var genMipmaps = (width > 1 && height > 1);
 			var usage = TextureUsage.Sampled;
 			if (genMipmaps) usage |= TextureUsage.GenerateMipmaps;
+			usage |= usageFlags;
 
 			var rf = device.ResourceFactory;
 			var texture = rf.CreateTexture(new TextureDescription(
@@ -162,5 +166,52 @@ namespace Common
 
 		private void CreateFallbackTexture() =>
 			_fallbackTex = CreateFallbackTexture(_gd, _allocator);
+
+		private static string[] s_envSuffixes = new[] {
+			"rt", "lf", "up", "dn", "ft", "bk"
+		};
+		public Texture LoadSky(string name)
+		{
+			Func<string, string, FileSystemPath> path = (n, s) => FileSystemPath.Parse($"/env/{n}{s}.pcx");
+			if (name == null) goto fallback;
+
+			foreach (var suffix in s_envSuffixes)
+				if (!_fs.Exists(path(name, suffix)))
+					goto fallback;
+
+			var faces = _allocator.Rent<PCXTexture>(6);
+			for (var i = 0; i < 6; i++)
+			{
+				var file = _fs.OpenFile(path(name, s_envSuffixes[i]), FileAccess.Read);
+				faces[i] = PCXReader.ReadPCX(file, _allocator);
+				file.Close();
+			}
+			// TODO: Check if all cubemap faces have same dimensions
+			var texture = _gd.ResourceFactory.CreateTexture(new TextureDescription(
+				(uint)faces[0].Width, (uint)faces[0].Height, 1, 1, 1,
+				PixelFormat.R8_G8_B8_A8_UNorm,
+				TextureUsage.Sampled | TextureUsage.Cubemap,
+				TextureType.Texture2D
+			));
+
+			var pixelCount = texture.Width * texture.Height;
+			var pixels = _allocator.Rent<ColorRGBA>((int)pixelCount);
+			for (var f = 0; f < 6; f++)
+			{
+				var indexes = faces[f].Pixels;
+				var palette = faces[f].Palette;
+				for (var i = 0; i < pixelCount; i++)
+					pixels[i] = palette[indexes[i]];
+				_gd.UpdateTexture<ColorRGBA>(texture, pixels, 0, 0, 0, texture.Width, texture.Height, 1, 0, (uint)f);
+			}
+			_allocator.Return(pixels);
+			_allocator.Return(faces);
+			_allTextures.Add(texture);
+			return texture;
+
+		fallback:
+			var color = new ColorRGBA(150, 150, 150);
+			return CreateSingleColorTexture(_gd, 6, color, TextureUsage.Cubemap);
+		}
 	}
 }

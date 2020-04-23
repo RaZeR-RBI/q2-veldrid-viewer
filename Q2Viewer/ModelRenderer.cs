@@ -19,6 +19,10 @@ namespace Q2Viewer
 			new VertexElementDescription("LMCoords", VertexElementSemantic.TextureCoordinate, VertexElementFormat.Float2)
 		);
 
+		private static readonly VertexLayoutDescription s_vertexPosLayout = new VertexLayoutDescription(
+			new VertexElementDescription("Position", VertexElementSemantic.Position, VertexElementFormat.Float3)
+		);
+
 		private struct CommonShaderParams
 		{
 			public float Gamma;
@@ -37,9 +41,13 @@ namespace Q2Viewer
 		private readonly ResourceSet _worldAlphaSet;
 		private readonly ResourceLayout _diffuseLayout;
 		private readonly ResourceLayout _lightmapLayout;
+		private readonly ResourceLayout _skyboxLayout;
+		private readonly DeviceBuffer _skyboxVerts;
+		private readonly DeviceBuffer _skyboxIndices;
 
 		private readonly Pipeline _noBlendPipeline;
 		private readonly Pipeline _alphaBlendPipeline;
+		private readonly Pipeline _skyboxPipeline;
 		private readonly Sampler _diffuseSampler;
 		private readonly Sampler _lightmapSampler;
 
@@ -191,6 +199,35 @@ namespace Q2Viewer
 				new[] { projViewLayout, worldAlphaLayout, _diffuseLayout },
 				_device.MainSwapchain.Framebuffer.OutputDescription
 			));
+
+			_skyboxLayout = factory.CreateResourceLayout(
+				new ResourceLayoutDescription(
+					new ResourceLayoutElementDescription("SkyboxTexture", ResourceKind.TextureReadOnly, ShaderStages.Fragment),
+					new ResourceLayoutElementDescription("SkyboxSampler", ResourceKind.Sampler, ShaderStages.Fragment)
+				));
+			var sbShaderSet = new ShaderSetDescription(new[] {
+				s_vertexPosLayout
+			},
+			factory.CreateFromSpirv(
+				new ShaderDescription(ShaderStages.Vertex, Encoding.UTF8.GetBytes(SkyboxVert), "main"),
+				new ShaderDescription(ShaderStages.Fragment, Encoding.UTF8.GetBytes(SkyboxFrag), "main")
+			));
+
+			_skyboxPipeline = factory.CreateGraphicsPipeline(new GraphicsPipelineDescription(
+				BlendStateDescription.SingleAlphaBlend,
+				DepthStencilStateDescription.DepthOnlyLessEqual,
+				// RasterizerStateDescription.Default,
+				new RasterizerStateDescription(FaceCullMode.None, PolygonFillMode.Solid, FrontFace.Clockwise, true, true),
+				PrimitiveTopology.TriangleList,
+				sbShaderSet,
+				new[] { projViewLayout, _skyboxLayout },
+				_device.MainSwapchain.Framebuffer.OutputDescription
+			));
+
+			_skyboxVerts = factory.CreateBuffer(new BufferDescription((uint)s_skyboxVerts.Length * VertexPosition.SizeInBytes, BufferUsage.VertexBuffer));
+			_device.UpdateBuffer(_skyboxVerts, 0, s_skyboxVerts);
+			_skyboxIndices = factory.CreateBuffer(new BufferDescription((uint)sizeof(ushort) * (uint)s_skyboxIndices.Length, BufferUsage.IndexBuffer));
+			_device.UpdateBuffer(_skyboxIndices, 0, s_skyboxIndices);
 			NextLightmapStyleFrame();
 		}
 
@@ -335,7 +372,24 @@ namespace Q2Viewer
 			calls++;
 		}
 
+		public void DrawSkybox(CommandList cl, Texture texture)
+		{
+			cl.SetPipeline(_skyboxPipeline);
+			cl.SetVertexBuffer(0, _skyboxVerts);
+			cl.SetIndexBuffer(_skyboxIndices, IndexFormat.UInt16);
+			cl.SetGraphicsResourceSet(0, _projViewSet);
+			if (!_textureSets.ContainsKey(texture))
+				CreateTextureSet(texture, _diffuseSampler, _skyboxLayout);
+			var textureSet = _textureSets[texture];
+			cl.SetGraphicsResourceSet(1, textureSet);
+			var fb = _device.MainSwapchain.Framebuffer;
+			cl.SetViewport(0, new Viewport(0, 0, fb.Width, fb.Height, 1, 1));
+			cl.DrawIndexed((uint)s_skyboxIndices.Length, 1, 0, 0, 0);
+			cl.SetViewport(0, new Viewport(0, 0, fb.Width, fb.Height, 0, 1));
+		}
 
+
+		// TODO: Optimize - replace separate World, View and Projection matrices with one matrix
 		private const string VertexShader = @"
 #version 450
 layout(set = 0, binding = 0) uniform ProjectionBuffer
@@ -446,5 +500,91 @@ void main()
 	vec3 rgb = pow(color, gamma);
 	fsout_color = vec4(rgb, Factor);
 }";
+
+		private const string SkyboxVert = @"
+#version 450
+layout (location = 0) in vec3 Position;
+layout (location = 0) out vec3 TexCoords;
+
+layout(set = 0, binding = 0) uniform ProjectionBuffer
+{
+    mat4 Projection;
+};
+layout(set = 0, binding = 1) uniform ViewBuffer
+{
+    mat4 View;
+};
+
+void main()
+{
+	mat4 view3x3 = mat4(
+        View[0][0], View[0][1], View[0][2], 0,
+        View[1][0], View[1][1], View[1][2], 0,
+        View[2][0], View[2][1], View[2][2], 0,
+        0, 0, 0, 1);
+    vec4 pos = Projection * view3x3 * vec4(Position, 1);
+    gl_Position = vec4(pos.x, pos.y, pos.w, pos.w);
+	TexCoords = Position;
+}
+		";
+
+		private const string SkyboxFrag = @"
+#version 450
+
+layout(location = 0) in vec3 TexCoords;
+layout(location = 0) out vec4 fsout_color;
+
+layout(set = 1, binding = 0) uniform textureCube SkyboxTexture;
+layout(set = 1, binding = 1) uniform sampler SkyboxSampler;
+
+void main()
+{
+	vec3 color = texture(samplerCube(SkyboxTexture, SkyboxSampler), TexCoords).xyz;
+	fsout_color = vec4(color, 1);
+}
+		";
+		private static readonly Vector3[] s_skyboxVerts = new Vector3[]
+		{
+            // Top
+            new Vector3(-20.0f,20.0f,-20.0f),
+			new Vector3(20.0f,20.0f,-20.0f),
+			new Vector3(20.0f,20.0f,20.0f),
+			new Vector3(-20.0f,20.0f,20.0f),
+            // Bottom
+            new Vector3(-20.0f,-20.0f,20.0f),
+			new Vector3(20.0f,-20.0f,20.0f),
+			new Vector3(20.0f,-20.0f,-20.0f),
+			new Vector3(-20.0f,-20.0f,-20.0f),
+            // Left
+            new Vector3(-20.0f,20.0f,-20.0f),
+			new Vector3(-20.0f,20.0f,20.0f),
+			new Vector3(-20.0f,-20.0f,20.0f),
+			new Vector3(-20.0f,-20.0f,-20.0f),
+            // Right
+            new Vector3(20.0f,20.0f,20.0f),
+			new Vector3(20.0f,20.0f,-20.0f),
+			new Vector3(20.0f,-20.0f,-20.0f),
+			new Vector3(20.0f,-20.0f,20.0f),
+            // Back
+            new Vector3(20.0f,20.0f,-20.0f),
+			new Vector3(-20.0f,20.0f,-20.0f),
+			new Vector3(-20.0f,-20.0f,-20.0f),
+			new Vector3(20.0f,-20.0f,-20.0f),
+            // Front
+            new Vector3(-20.0f,20.0f,20.0f),
+			new Vector3(20.0f,20.0f,20.0f),
+			new Vector3(20.0f,-20.0f,20.0f),
+			new Vector3(-20.0f,-20.0f,20.0f),
+		};
+
+		private static readonly ushort[] s_skyboxIndices = new ushort[]
+		{
+			0,1,2, 0,2,3,
+			4,5,6, 4,6,7,
+			8,9,10, 8,10,11,
+			12,13,14, 12,14,15,
+			16,17,18, 16,18,19,
+			20,21,22, 20,22,23,
+		};
 	}
 }

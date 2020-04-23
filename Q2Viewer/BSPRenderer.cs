@@ -85,6 +85,7 @@ namespace Q2Viewer
 		private readonly List<ModelRenderInfo> _models = new List<ModelRenderInfo>();
 
 		private readonly TexturePool _texPool;
+		private readonly Texture _skybox;
 		private readonly GraphicsDevice _gd;
 
 		public BSPRenderer(BSPFile file, IArrayAllocator allocator, GraphicsDevice gd, IFileSystem fs)
@@ -105,6 +106,9 @@ namespace Q2Viewer
 
 			foreach (var name in textureNames)
 				_texPool.LoadMapTexture(name);
+
+			var skyboxName = GetSkyTextureName();
+			_skybox = _texPool.LoadSky(skyboxName);
 
 			sw.Stop();
 			Log.Debug($"Textures loaded in {FormatSW(sw)}");
@@ -145,6 +149,18 @@ namespace Q2Viewer
 				modelIndex++;
 			}
 			Log.Debug($"Total models: {_models.Count}");
+		}
+
+		private string GetSkyTextureName()
+		{
+			var s = _file.EntitiesString;
+			var indexOfSkyParam = s.IndexOf("\"sky\"");
+			if (indexOfSkyParam < 0) return null;
+			var openingQuoteIndex = s.IndexOf('"', indexOfSkyParam + 5);
+			if (openingQuoteIndex < 0) return null;
+			var closingQuoteIndex = s.IndexOf('"', openingQuoteIndex + 1);
+			if (closingQuoteIndex < 0) return null;
+			return s.Substring(openingQuoteIndex + 1, closingQuoteIndex - openingQuoteIndex - 1);
 		}
 
 		private bool IsDrawable(SurfaceFlags flags) =>
@@ -354,7 +370,8 @@ namespace Q2Viewer
 
 		public int Draw(CommandList cl, ModelRenderer renderer)
 		{
-			var calls = 0;
+			var calls = 1;
+			renderer.DrawSkybox(cl, _skybox);
 			foreach (var mri in _models)
 				calls += renderer.Draw(cl, mri, Matrix4x4.Identity);
 			return calls;

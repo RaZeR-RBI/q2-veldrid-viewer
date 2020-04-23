@@ -57,8 +57,8 @@ namespace Common
 
 			if (header[65] != 1)
 				throw new IOException("Only 256-color paletted PCX images are supported");
-			if (header[68] != 2)
-				throw new IOException("Only RGB palette is supported");
+			// if (header[68] != 2)
+				// throw new IOException("Only RGB palette is supported");
 
 			var total = width * height;
 			var pixels = allocator.Rent<byte>(total);
