@@ -89,7 +89,6 @@ namespace MD2Viewer
 			Matrix4x4.Invert(Matrix4x4.Identity, out Matrix4x4 worldInverted);
 			_gd.UpdateBuffer(_worldITBuffer, 0, Matrix4x4.Transpose(worldInverted));
 
-			// TODO: Pack frame data into texture and use it for animation
 			_vertexCount = (uint)File.Triangles.Length * 3;
 			var frame = Reader.GetFrames().First();
 #if false

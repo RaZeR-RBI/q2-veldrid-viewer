@@ -65,7 +65,6 @@ namespace MD2Viewer
 			var vtrans = translate;
 			var vscale = scale;
 
-			// TODO: Check if there is a more efficient way to store positions
 			var frameIndex = 0;
 			var frameStep = 1f / (float)frameCount;
 			foreach (var frame in reader.GetFrames())

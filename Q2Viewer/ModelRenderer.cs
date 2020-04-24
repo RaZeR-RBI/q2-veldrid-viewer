@@ -33,12 +33,11 @@ namespace Q2Viewer
 
 		private readonly GraphicsDevice _device;
 
-		private readonly DeviceBuffer _worldBuffer;
-		private readonly ResourceSet _projViewSet;
-		private readonly ResourceSet _worldParamSet;
+		private readonly DeviceBuffer _clipBuffer;
+		private readonly ResourceSet _noBlendParamSet;
 		private readonly DeviceBuffer _commonParamsBuffer;
 		private readonly DeviceBuffer _lmParamsBuffer;
-		private readonly ResourceSet _worldAlphaSet;
+		private readonly ResourceSet _alphaBlendParamSet;
 		private readonly ResourceLayout _diffuseLayout;
 		private readonly ResourceLayout _lightmapLayout;
 		private readonly ResourceLayout _skyboxLayout;
@@ -96,8 +95,8 @@ namespace Q2Viewer
 				layers: LightmapAllocator.LightmapsPerFace,
 				new ColorRGBA(20, 20, 20));
 
-			_worldBuffer = factory.CreateBuffer(new BufferDescription(64, BufferUsage.UniformBuffer | BufferUsage.Dynamic));
-			_device.UpdateBuffer(_worldBuffer, 0, Matrix4x4.Identity);
+			_clipBuffer = factory.CreateBuffer(new BufferDescription(64, BufferUsage.UniformBuffer | BufferUsage.Dynamic));
+			_device.UpdateBuffer(_clipBuffer, 0, Matrix4x4.Identity);
 
 			_commonParamsBuffer = factory.CreateBuffer(new BufferDescription(16, BufferUsage.UniformBuffer | BufferUsage.Dynamic));
 			_device.UpdateBuffer(_commonParamsBuffer, 0, _commonParams);
@@ -114,14 +113,9 @@ namespace Q2Viewer
 					new ShaderDescription(ShaderStages.Fragment, Encoding.UTF8.GetBytes(LightmappedFrag), "main")
 				));
 
-			var projViewLayout = factory.CreateResourceLayout(
-					new ResourceLayoutDescription(
-						new ResourceLayoutElementDescription("ProjectionBuffer", ResourceKind.UniformBuffer, ShaderStages.Vertex),
-						new ResourceLayoutElementDescription("ViewBuffer", ResourceKind.UniformBuffer, ShaderStages.Vertex)
-					));
 			var lmParamsLayout = factory.CreateResourceLayout(
 				new ResourceLayoutDescription(
-					new ResourceLayoutElementDescription("WorldBuffer", ResourceKind.UniformBuffer, ShaderStages.Vertex),
+					new ResourceLayoutElementDescription("ClipBuffer", ResourceKind.UniformBuffer, ShaderStages.Vertex),
 					new ResourceLayoutElementDescription("ParamsBuffer", ResourceKind.UniformBuffer, ShaderStages.Vertex | ShaderStages.Fragment),
 					new ResourceLayoutElementDescription("LightStylesBuffer", ResourceKind.UniformBuffer, ShaderStages.Vertex | ShaderStages.Fragment)
 				));
@@ -142,18 +136,13 @@ namespace Q2Viewer
 				RasterizerStateDescription.Default,
 				PrimitiveTopology.TriangleList,
 				lmShaderSet,
-				new[] { projViewLayout, lmParamsLayout, _diffuseLayout, _lightmapLayout },
+				new[] { lmParamsLayout, _diffuseLayout, _lightmapLayout },
 				_device.MainSwapchain.Framebuffer.OutputDescription
 			));
 
-			_projViewSet = factory.CreateResourceSet(new ResourceSetDescription(
-				projViewLayout,
-				projBuf,
-				viewBuf));
-
-			_worldParamSet = factory.CreateResourceSet(new ResourceSetDescription(
+			_noBlendParamSet = factory.CreateResourceSet(new ResourceSetDescription(
 				lmParamsLayout,
-				_worldBuffer,
+				_clipBuffer,
 				_commonParamsBuffer,
 				_lmParamsBuffer
 			));
@@ -173,13 +162,13 @@ namespace Q2Viewer
 
 			_lightmapSampler = _device.LinearSampler;
 
-			var worldAlphaLayout = factory.CreateResourceLayout(new ResourceLayoutDescription(
-				new ResourceLayoutElementDescription("WorldBuffer", ResourceKind.UniformBuffer, ShaderStages.Vertex),
+			var abParamsLayout = factory.CreateResourceLayout(new ResourceLayoutDescription(
+				new ResourceLayoutElementDescription("ClipBuffer", ResourceKind.UniformBuffer, ShaderStages.Vertex),
 				new ResourceLayoutElementDescription("ParamsBuffer", ResourceKind.UniformBuffer, ShaderStages.Fragment | ShaderStages.Vertex)
 			));
-			_worldAlphaSet = factory.CreateResourceSet(new ResourceSetDescription(
-				worldAlphaLayout,
-				_worldBuffer,
+			_alphaBlendParamSet = factory.CreateResourceSet(new ResourceSetDescription(
+				abParamsLayout,
+				_clipBuffer,
 				_commonParamsBuffer
 			));
 			var abShaderSet = new ShaderSetDescription(
@@ -196,7 +185,7 @@ namespace Q2Viewer
 				RasterizerStateDescription.Default,
 				PrimitiveTopology.TriangleList,
 				abShaderSet,
-				new[] { projViewLayout, worldAlphaLayout, _diffuseLayout },
+				new[] { abParamsLayout, _diffuseLayout },
 				_device.MainSwapchain.Framebuffer.OutputDescription
 			));
 
@@ -220,7 +209,7 @@ namespace Q2Viewer
 				new RasterizerStateDescription(FaceCullMode.None, PolygonFillMode.Solid, FrontFace.Clockwise, true, true),
 				PrimitiveTopology.TriangleList,
 				sbShaderSet,
-				new[] { projViewLayout, _skyboxLayout },
+				new[] { abParamsLayout, _skyboxLayout },
 				_device.MainSwapchain.Framebuffer.OutputDescription
 			));
 
@@ -289,9 +278,9 @@ namespace Q2Viewer
 
 		public int Draw(CommandList cl, ModelRenderInfo mri, Matrix4x4 worldMatrix)
 		{
-			cl.UpdateBuffer(_worldBuffer, 0, worldMatrix);
 			var calls = 0;
-			var clipMatrix = Camera.ViewMatrix * Camera.ProjectionMatrix;
+			var clipMatrix = worldMatrix * Camera.ViewMatrix * Camera.ProjectionMatrix;
+			cl.UpdateBuffer(_clipBuffer, 0, clipMatrix);
 			cl.SetVertexBuffer(0, mri.Buffer);
 			cl.SetPipeline(_noBlendPipeline);
 			ReadOnlySpan<float> lightStyles = _lightStyleValues.AsSpan();
@@ -340,10 +329,9 @@ namespace Q2Viewer
 			lightValues[3] = fg.LightmapStyle4 == 255 ? 0 : lightStyles[fg.LightmapStyle4];
 			cl.UpdateBuffer(_lmParamsBuffer, 0, lightValues);
 
-			cl.SetGraphicsResourceSet(0, _projViewSet);
-			cl.SetGraphicsResourceSet(1, _worldParamSet);
-			cl.SetGraphicsResourceSet(2, diffuseSet);
-			cl.SetGraphicsResourceSet(3, lightmapSet);
+			cl.SetGraphicsResourceSet(0, _noBlendParamSet);
+			cl.SetGraphicsResourceSet(1, diffuseSet);
+			cl.SetGraphicsResourceSet(2, lightmapSet);
 			cl.Draw(fg.Count, 1, fg.BufferOffset, 0);
 			calls++;
 		}
@@ -365,19 +353,23 @@ namespace Q2Viewer
 			common.Factor = fg.Flags.HasFlag(SurfaceFlags.Transparent33) ? 0.33f : 0.66f;
 			cl.UpdateBuffer(_commonParamsBuffer, 0, common);
 
-			cl.SetGraphicsResourceSet(0, _projViewSet);
-			cl.SetGraphicsResourceSet(1, _worldAlphaSet);
-			cl.SetGraphicsResourceSet(2, diffuseSet);
+			cl.SetGraphicsResourceSet(0, _alphaBlendParamSet);
+			cl.SetGraphicsResourceSet(1, diffuseSet);
 			cl.Draw(fg.Count, 1, fg.BufferOffset, 0);
 			calls++;
 		}
 
 		public void DrawSkybox(CommandList cl, Texture texture)
 		{
+			var view3x3 = Camera.ViewMatrix;
+			view3x3.Translation = Vector3.Zero;
+			var clipMatrix = view3x3 * Camera.ProjectionMatrix;
+			cl.UpdateBuffer(_clipBuffer, 0, clipMatrix);
+
 			cl.SetPipeline(_skyboxPipeline);
 			cl.SetVertexBuffer(0, _skyboxVerts);
 			cl.SetIndexBuffer(_skyboxIndices, IndexFormat.UInt16);
-			cl.SetGraphicsResourceSet(0, _projViewSet);
+			cl.SetGraphicsResourceSet(0, _alphaBlendParamSet);
 			if (!_textureSets.ContainsKey(texture))
 				CreateTextureSet(texture, _device.LinearSampler, _skyboxLayout);
 			var textureSet = _textureSets[texture];
@@ -389,22 +381,13 @@ namespace Q2Viewer
 		}
 
 
-		// TODO: Optimize - replace separate World, View and Projection matrices with one matrix
 		private const string VertexShader = @"
 #version 450
-layout(set = 0, binding = 0) uniform ProjectionBuffer
+layout(set = 0, binding = 0) uniform ClipBuffer
 {
-    mat4 Projection;
+    mat4 Clip;
 };
-layout(set = 0, binding = 1) uniform ViewBuffer
-{
-    mat4 View;
-};
-layout(set = 1, binding = 0) uniform WorldBuffer
-{
-    mat4 World;
-};
-layout(set = 1, binding = 1) uniform ParamsBuffer
+layout(set = 0, binding = 1) uniform ParamsBuffer
 {
 	float Gamma;
 	float Scroll;
@@ -421,9 +404,7 @@ layout(location = 0) out vec2 fsin_texCoords;
 layout(location = 1) out vec2 fsin_lmCoords;
 void main()
 {
-    vec4 worldPosition = World * vec4(Position, 1);
-    vec4 viewPosition = View * worldPosition;
-    vec4 clipPosition = Projection * viewPosition;
+	vec4 clipPosition = Clip * vec4(Position, 1);
     gl_Position = clipPosition;
     vec2 tx = TexCoords + vec2(Scroll, 0.0);
 	if (WarpAngle != 0.0) {
@@ -440,7 +421,7 @@ layout(location = 0) in vec2 fsin_texCoords;
 layout(location = 1) in vec2 fsin_lmCoords;
 layout(location = 0) out vec4 fsout_color;
 
-layout(set = 1, binding = 1) uniform ParamsBuffer
+layout(set = 0, binding = 1) uniform ParamsBuffer
 {
 	float Gamma;
 	float Scroll;
@@ -448,16 +429,16 @@ layout(set = 1, binding = 1) uniform ParamsBuffer
 	float Factor;
 };
 
-layout(set = 1, binding = 2) uniform LightStylesBuffer
+layout(set = 0, binding = 2) uniform LightStylesBuffer
 {
 	vec4 LightValues;
 };
 
-layout(set = 2, binding = 0) uniform texture2D DiffuseTexture;
-layout(set = 2, binding = 1) uniform sampler DiffuseSampler;
+layout(set = 1, binding = 0) uniform texture2D DiffuseTexture;
+layout(set = 1, binding = 1) uniform sampler DiffuseSampler;
 
-layout(set = 3, binding = 0) uniform sampler LightmapSampler;
-layout(set = 3, binding = 1) uniform texture2DArray LightmapTexture;
+layout(set = 2, binding = 0) uniform sampler LightmapSampler;
+layout(set = 2, binding = 1) uniform texture2DArray LightmapTexture;
 
 void main()
 {
@@ -481,7 +462,7 @@ void main()
 layout(location = 0) in vec2 fsin_texCoords;
 layout(location = 0) out vec4 fsout_color;
 
-layout(set = 1, binding = 1) uniform ParamsBuffer
+layout(set = 0, binding = 1) uniform ParamsBuffer
 {
 	float Gamma;
 	float Scroll;
@@ -489,8 +470,8 @@ layout(set = 1, binding = 1) uniform ParamsBuffer
 	float Factor;
 };
 
-layout(set = 2, binding = 0) uniform texture2D DiffuseTexture;
-layout(set = 2, binding = 1) uniform sampler DiffuseSampler;
+layout(set = 1, binding = 0) uniform texture2D DiffuseTexture;
+layout(set = 1, binding = 1) uniform sampler DiffuseSampler;
 
 void main()
 {
@@ -506,23 +487,22 @@ void main()
 layout (location = 0) in vec3 Position;
 layout (location = 0) out vec3 TexCoords;
 
-layout(set = 0, binding = 0) uniform ProjectionBuffer
+layout(set = 0, binding = 0) uniform ClipBuffer
 {
-    mat4 Projection;
+    mat4 Clip;
 };
-layout(set = 0, binding = 1) uniform ViewBuffer
+
+layout(set = 0, binding = 1) uniform ParamsBuffer
 {
-    mat4 View;
+	float Gamma;
+	float Scroll;
+	float WarpAngle;
+	float Factor;
 };
 
 void main()
 {
-	mat4 view3x3 = mat4(
-        View[0][0], View[0][1], View[0][2], 0,
-        View[1][0], View[1][1], View[1][2], 0,
-        View[2][0], View[2][1], View[2][2], 0,
-        0, 0, 0, 1);
-    vec4 pos = Projection * view3x3 * vec4(Position, 1);
+    vec4 pos = Clip * vec4(Position, 1);
     gl_Position = vec4(pos.x, pos.y, pos.w, pos.w);
 	TexCoords = Position;
 }
