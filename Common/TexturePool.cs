@@ -186,7 +186,13 @@ namespace Common
 				faces[i] = PCXReader.ReadPCX(file, _allocator);
 				file.Close();
 			}
-			// TODO: Check if all cubemap faces have same dimensions
+			var widths = faces.Take(6).Select(f => f.Width).Distinct();
+			var heights = faces.Take(6).Select(f => f.Height).Distinct();
+			if (widths.Count() > 1 || heights.Count() > 1)
+				throw new IOException("Sky textures should have identical width and height");
+			if (widths.First() != heights.First())
+				throw new IOException("Sky textures should be square");
+
 			var texture = _gd.ResourceFactory.CreateTexture(new TextureDescription(
 				(uint)faces[0].Width, (uint)faces[0].Height, 1, 1, 1,
 				PixelFormat.R8_G8_B8_A8_UNorm,
@@ -196,12 +202,31 @@ namespace Common
 
 			var pixelCount = texture.Width * texture.Height;
 			var pixels = _allocator.Rent<ColorRGBA>((int)pixelCount);
+			var size = texture.Width;
 			for (var f = 0; f < 6; f++)
 			{
 				var indexes = faces[f].Pixels;
 				var palette = faces[f].Palette;
-				for (var i = 0; i < pixelCount; i++)
-					pixels[i] = palette[indexes[i]];
+				for (var x = 0; x < size; x++)
+					for (var y = 0; y < texture.Height; y++)
+					{
+						// up or down
+						if (f == 2 || f == 3)
+						{
+							// flip x and y axes
+							var src = y + x * size;
+							var dst = x + y * size;
+							pixels[dst] = palette[indexes[src]];
+						}
+						else
+						{
+							// flip horizontally
+							var src = x + y * size;
+							var dst = (size - x - 1) + (y * size);
+							pixels[dst] = palette[indexes[src]];
+						}
+					}
+
 				_gd.UpdateTexture<ColorRGBA>(texture, pixels, 0, 0, 0, texture.Width, texture.Height, 1, 0, (uint)f);
 			}
 			_allocator.Return(pixels);

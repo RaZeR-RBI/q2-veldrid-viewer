@@ -379,7 +379,7 @@ namespace Q2Viewer
 			cl.SetIndexBuffer(_skyboxIndices, IndexFormat.UInt16);
 			cl.SetGraphicsResourceSet(0, _projViewSet);
 			if (!_textureSets.ContainsKey(texture))
-				CreateTextureSet(texture, _diffuseSampler, _skyboxLayout);
+				CreateTextureSet(texture, _device.LinearSampler, _skyboxLayout);
 			var textureSet = _textureSets[texture];
 			cl.SetGraphicsResourceSet(1, textureSet);
 			var fb = _device.MainSwapchain.Framebuffer;
@@ -540,7 +540,8 @@ layout(set = 1, binding = 1) uniform sampler SkyboxSampler;
 void main()
 {
 	vec3 color = texture(samplerCube(SkyboxTexture, SkyboxSampler), TexCoords).xyz;
-	fsout_color = vec4(color, 1);
+	vec3 gamma = vec3(1.0 / 2.2); // TODO: Configurable gamma
+	fsout_color = vec4(pow(color, gamma), 1);
 }
 		";
 		private static readonly Vector3[] s_skyboxVerts = new Vector3[]
