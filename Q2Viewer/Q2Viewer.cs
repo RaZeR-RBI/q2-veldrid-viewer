@@ -72,10 +72,11 @@ namespace Q2Viewer
 			_debugPrimitives = new DebugPrimitives(Graphics, _viewBuf, _projBuf, _camera);
 			_modelRenderer = new ModelRenderer(Graphics, _viewBuf, _projBuf, _camera);
 
-			var bspFileStream = System.IO.File.OpenRead(_options.MapPath);
-			var bspFile = new BSPFile(bspFileStream, SharedArrayPoolAllocator.Instance);
-			bspFileStream.Close();
-			_renderer = new BSPRenderer(bspFile, SharedArrayPoolAllocator.Instance, Graphics, _fs);
+			using (var bspFileStream = System.IO.File.OpenRead(_options.MapPath))
+			{
+				var bspFile = new BSPFile(bspFileStream, SharedArrayPoolAllocator.Instance);
+				_renderer = new BSPRenderer(bspFile, SharedArrayPoolAllocator.Instance, Graphics, _fs);
+			}
 		}
 
 		protected override void Update(TimeSpan frameTime)

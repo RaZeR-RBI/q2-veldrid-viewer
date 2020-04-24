@@ -115,6 +115,7 @@ namespace MD2Viewer
 					};
 			});
 			_gd.UpdateBuffer(_vertices, vertData, _vertexCount, VATVertex.SizeInBytes);
+			allocator.Return(vertData);
 #endif
 			var shaderSet = new ShaderSetDescription(
 				new[] {

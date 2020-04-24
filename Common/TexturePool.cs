@@ -76,35 +76,37 @@ namespace Common
 
 		private Texture LoadPCX(FileSystemPath path)
 		{
-			var file = _fs.OpenFile(path, FileAccess.Read);
-			var pcxTex = PCXReader.ReadPCX(file, _allocator);
-			var pixelCount = pcxTex.Width * pcxTex.Height;
-			var palette = pcxTex.Palette;
-			var pixels = _allocator.Rent<ColorRGBA>(pixelCount);
-			var indexes = pcxTex.Pixels;
-			for (var i = 0; i < pixelCount; i++)
-				pixels[i] = palette[indexes[i]];
-			var texture = CreateTexture(pcxTex.Width, pcxTex.Height, pixels, path.ToString());
-			_allocator.Return(pixels);
-			pcxTex.DisposePixelData();
-			file.Close();
-			return texture;
+			using (var file = _fs.OpenFile(path, FileAccess.Read))
+			{
+				var pcxTex = PCXReader.ReadPCX(file, _allocator);
+				var pixelCount = pcxTex.Width * pcxTex.Height;
+				var palette = pcxTex.Palette;
+				var pixels = _allocator.Rent<ColorRGBA>(pixelCount);
+				var indexes = pcxTex.Pixels;
+				for (var i = 0; i < pixelCount; i++)
+					pixels[i] = palette[indexes[i]];
+				var texture = CreateTexture(pcxTex.Width, pcxTex.Height, pixels, path.ToString());
+				_allocator.Return(pixels);
+				pcxTex.DisposePixelData();
+				return texture;
+			}
 		}
 
 		private Texture LoadWAL(FileSystemPath path)
 		{
-			var file = _fs.OpenFile(path, FileAccess.Read);
-			var walTex = WALReader.ReadWAL(file, _allocator);
-			var pixelCount = walTex.Width * walTex.Height;
-			var pixels = _allocator.Rent<ColorRGBA>(pixelCount);
-			var indexes = walTex.Mips[0].Pixels;
-			for (var i = 0; i < pixelCount; i++)
-				pixels[i] = QuakePalette.Colors[indexes[i]];
-			var texture = CreateTexture(walTex.Width, walTex.Height, pixels, path.ToString());
-			_allocator.Return(pixels);
-			walTex.DisposePixelData();
-			file.Close();
-			return texture;
+			using (var file = _fs.OpenFile(path, FileAccess.Read))
+			{
+				var walTex = WALReader.ReadWAL(file, _allocator);
+				var pixelCount = walTex.Width * walTex.Height;
+				var pixels = _allocator.Rent<ColorRGBA>(pixelCount);
+				var indexes = walTex.Mips[0].Pixels;
+				for (var i = 0; i < pixelCount; i++)
+					pixels[i] = QuakePalette.Colors[indexes[i]];
+				var texture = CreateTexture(walTex.Width, walTex.Height, pixels, path.ToString());
+				_allocator.Return(pixels);
+				walTex.DisposePixelData();
+				return texture;
+			}
 		}
 
 		private Texture CreateTexture(int width, int height, ColorRGBA[] pixels, string name = null)

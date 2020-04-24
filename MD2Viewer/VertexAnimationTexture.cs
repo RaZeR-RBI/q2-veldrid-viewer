@@ -36,13 +36,6 @@ namespace MD2Viewer
 			var npix = allocator.Rent<ColorRGBA>(vertexCount * frameCount);
 
 
-			var mins = allocator.Rent<Vector3>(vertexCount);
-			var maxes = allocator.Rent<Vector3>(vertexCount);
-			for (var i = 0; i < vertexCount; i++)
-			{
-				mins[i] = new Vector3(float.MaxValue);
-				maxes[i] = new Vector3(float.MinValue);
-			}
 			foreach (var frame in reader.GetFrames())
 				reader.ProcessFrame(frame, (_, vertices) =>
 				{
@@ -50,15 +43,10 @@ namespace MD2Viewer
 					{
 						min = Vector3.Min(min, vertices[i].Position);
 						max = Vector3.Max(max, vertices[i].Position);
-						mins[i] = Vector3.Min(mins[i], vertices[i].Position);
-						maxes[i] = Vector3.Max(maxes[i], vertices[i].Position);
 					}
 				});
 
 			translate = min;
-			scale = new Vector3(float.MinValue);
-			for (var i = 0; i < vertexCount; i++)
-				scale = Vector3.Max(scale, maxes[i] - mins[i]);
 			scale = max - min;
 
 			var offset = 0;
@@ -95,6 +83,8 @@ namespace MD2Viewer
 			}
 			positionTex = CreateTexture(gd, vertexCount, frameCount, ppix, PixelFormat.R16_G16_B16_A16_UNorm);
 			normalTex = CreateTexture(gd, vertexCount, frameCount, npix, PixelFormat.R8_G8_B8_A8_UNorm);
+			allocator.Return(ppix);
+			allocator.Return(npix);
 			return result;
 		}
 

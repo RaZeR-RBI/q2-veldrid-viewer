@@ -126,6 +126,8 @@ namespace MD2Viewer
 		{
 			if (_isDisposed) return;
 			_isDisposed = true;
+			_allocator.Return(_frames);
+			_allocator.Return(_frameBackingArray);
 			Skins.Dispose();
 			TextureCoords.Dispose();
 			Triangles.Dispose();

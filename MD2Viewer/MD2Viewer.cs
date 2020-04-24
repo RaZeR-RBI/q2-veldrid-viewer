@@ -59,16 +59,18 @@ namespace MD2Viewer
 			_viewBuf = rf.CreateBuffer(new BufferDescription(64, BufferUsage.UniformBuffer | BufferUsage.Dynamic));
 			_projBuf = rf.CreateBuffer(new BufferDescription(64, BufferUsage.UniformBuffer | BufferUsage.Dynamic));
 
-			var md2FileStream = System.IO.File.OpenRead(_options.ModelPath);
-			var md2File = new MD2File(md2FileStream, SharedArrayPoolAllocator.Instance);
-			_renderer = new MD2Renderer(
-				Graphics,
-				_fs,
-				md2File,
-				SharedArrayPoolAllocator.Instance,
-				_viewBuf,
-				_projBuf,
-				_camera);
+			using (var md2FileStream = System.IO.File.OpenRead(_options.ModelPath))
+			{
+				var md2File = new MD2File(md2FileStream, SharedArrayPoolAllocator.Instance);
+				_renderer = new MD2Renderer(
+					Graphics,
+					_fs,
+					md2File,
+					SharedArrayPoolAllocator.Instance,
+					_viewBuf,
+					_projBuf,
+					_camera);
+			}
 		}
 
 		protected override void Update(TimeSpan frameTime)
