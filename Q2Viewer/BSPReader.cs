@@ -25,8 +25,7 @@ namespace Q2Viewer
 		public const float LightmapSizeF = 16f;
 		public const int LightmapSize = 16;
 
-		public IEnumerable<LModel> GetModels() =>
-			File.Submodels.Data;
+		public Span<LModel> GetModels() => File.Submodels.Data;
 
 		public void ProcessVertices(LModel model, FaceVisitorCallback callback) =>
 			ProcessVertices(Enumerable.Range(model.FirstFace, model.NumFaces), callback);

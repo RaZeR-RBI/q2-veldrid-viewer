@@ -6,15 +6,17 @@ using static Common.Util;
 
 namespace Common
 {
-	public struct WALMipData
+	public struct WALMipData : IDisposable
 	{
 		public int Length;
 		public int Width;
 		public int Height;
-		public byte[] Pixels;
+		public DisposableArray<byte> Pixels;
+
+		public void Dispose() => Pixels.Dispose();
 	}
 
-	public struct WALTexture
+	public struct WALTexture : IDisposable
 	{
 		public string Name;
 		public int Width;
@@ -40,13 +42,10 @@ namespace Common
 			_allocator = allocator;
 		}
 
-		public void DisposePixelData()
+		public void Dispose()
 		{
-			for (var i = 0; i < MipCount; i++)
-			{
-				_allocator.Return(Mips[i].Pixels);
-				Mips[i].Pixels = null;
-			}
+			foreach (var mip in Mips.AsSpan().Slice(0, MipCount))
+				mip.Dispose();
 			_allocator.Return(Mips);
 			Mips = null;
 		}
@@ -55,7 +54,7 @@ namespace Common
 	public static class WALReader
 	{
 		public const int MipCount = 4;
-		public static WALTexture ReadWAL(Stream stream, IArrayAllocator allocator)
+		public static WALTexture ReadWAL(Stream stream, IArrayAllocator arrAlloc, IMemoryAllocator memAlloc)
 		{
 			// Note: only Quake 2 WALs are supported
 			if (!stream.CanRead || !stream.CanSeek)
@@ -76,14 +75,13 @@ namespace Common
 			var value = ReadUInt32LittleEndian(headerBytes.Slice(96));
 
 
-			var mips = allocator.Rent<WALMipData>(MipCount);
+			var mips = arrAlloc.Rent<WALMipData>(MipCount);
 			var expectedSize = width * height;
 			for (var i = 0; i < MipCount; i++)
 			{
-				var bytes = allocator.Rent<byte>(expectedSize);
-				var ms = new MemoryStream(bytes);
-				stream.Seek(offsets[i], SeekOrigin.Begin);
-				ChunkedStreamRead(stream, ms, expectedSize);
+				var bytes = new DisposableArray<byte>(expectedSize, memAlloc);
+				EnsureRead(stream, bytes.AsSpan());
+
 				expectedSize /= 4;
 				mips[i] = new WALMipData()
 				{
@@ -105,7 +103,7 @@ namespace Common
 				value,
 				mips,
 				MipCount,
-				allocator
+				arrAlloc
 			);
 		}
 	}

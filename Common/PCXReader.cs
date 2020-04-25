@@ -5,36 +5,31 @@ using static System.Buffers.Binary.BinaryPrimitives;
 
 namespace Common
 {
-	public struct PCXTexture
+	public struct PCXTexture : IDisposable
 	{
 		public int Width;
 		public int Height;
-		public byte[] Pixels;
-		public ColorRGBA[] Palette;
+		public DisposableArray<byte> Pixels;
+		public DisposableArray<ColorRGBA> Palette;
 
-		private IArrayAllocator _allocator;
-
-		public PCXTexture(int width, int height, byte[] pixels, ColorRGBA[] palette, IArrayAllocator allocator)
+		public PCXTexture(int width, int height, DisposableArray<byte> pixels, DisposableArray<ColorRGBA> palette)
 		{
 			Width = width;
 			Height = height;
 			Pixels = pixels;
 			Palette = palette;
-			_allocator = allocator;
 		}
 
-		public void DisposePixelData()
+		public void Dispose()
 		{
-			_allocator.Return(Pixels);
-			_allocator.Return(Palette);
-			Pixels = null;
-			Palette = null;
+			Pixels.Dispose();
+			Palette.Dispose();
 		}
 	}
 
 	public static class PCXReader
 	{
-		public static PCXTexture ReadPCX(Stream stream, IArrayAllocator allocator)
+		public static PCXTexture ReadPCX(Stream stream, IMemoryAllocator allocator)
 		{
 			Span<byte> header = stackalloc byte[128];
 			EnsureRead(stream, header);
@@ -58,10 +53,10 @@ namespace Common
 			if (header[65] != 1)
 				throw new IOException("Only 256-color paletted PCX images are supported");
 			// if (header[68] != 2)
-				// throw new IOException("Only RGB palette is supported");
+			// throw new IOException("Only RGB palette is supported");
 
 			var total = width * height;
-			var pixels = allocator.Rent<byte>(total);
+			var pixels = new DisposableArray<byte>(total, allocator);
 			if (!rle)
 				EnsureRead(stream, pixels);
 			else
@@ -90,7 +85,7 @@ namespace Common
 
 			var fileLength = stream.Length;
 
-			var palette = allocator.Rent<ColorRGBA>(256);
+			var palette = new DisposableArray<ColorRGBA>(256, allocator);
 			Span<byte> paletteBytes = stackalloc byte[768];
 
 			stream.Seek(-paletteBytes.Length - 1, SeekOrigin.End);
@@ -105,13 +100,7 @@ namespace Common
 				);
 
 
-			return new PCXTexture(
-				width,
-				height,
-				pixels,
-				palette,
-				allocator
-			);
+			return new PCXTexture(width, height, pixels, palette);
 		}
 	}
 }

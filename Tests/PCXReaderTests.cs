@@ -15,7 +15,7 @@ namespace Tests
 			try
 			{
 				stream = File.OpenRead("skin.pcx");
-				var pcx = PCXReader.ReadPCX(stream, SharedArrayPoolAllocator.Instance);
+				var pcx = PCXReader.ReadPCX(stream, DirectHeapMemoryAllocator.Instance);
 				pcx.Width.Should().Be(276);
 				pcx.Height.Should().Be(194);
 				pcx.Pixels[0].Should().Be(191);

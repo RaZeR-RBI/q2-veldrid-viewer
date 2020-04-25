@@ -3,11 +3,6 @@ using System.IO;
 using Common;
 using static Common.Util;
 using static System.Buffers.Binary.BinaryPrimitives;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
-using System.Numerics;
-using System.Linq;
-using System.Collections.Generic;
 
 namespace MD2Viewer
 {
@@ -22,16 +17,16 @@ namespace MD2Viewer
 		public readonly Lump<MD2Triangle> Triangles;
 		public readonly Lump<LIntValue> Commands;
 
-		private readonly MD2Vertex[] _frameBackingArray;
-		private readonly MD2Frame[] _frames;
+		private readonly DisposableArray<MD2Vertex> _frameBackingArray;
+		private readonly DisposableArray<MD2Frame> _frames;
 		public int FrameCount { get; private set; }
-		public IEnumerable<MD2Frame> Frames => _frames.Take(FrameCount);
+		public Span<MD2Frame> Frames => _frames;
 
-		private readonly IArrayAllocator _allocator;
+		private readonly IMemoryAllocator _allocator;
 
 
 		private const int HeaderSize = 68;
-		public MD2File(Stream stream, IArrayAllocator allocator)
+		public MD2File(Stream stream, IMemoryAllocator allocator)
 		{
 			_allocator = allocator;
 			Span<byte> headerBytes = stackalloc byte[HeaderSize];
@@ -77,8 +72,8 @@ namespace MD2Viewer
 			Commands.Read(stream, offsetCmds, numCmds * sizeof(int));
 
 			// read frames
-			_frames = _allocator.Rent<MD2Frame>(FrameCount);
-			_frameBackingArray = _allocator.Rent<MD2Vertex>(FrameCount * VertexCount);
+			_frames = new DisposableArray<MD2Frame>(FrameCount, _allocator);
+			_frameBackingArray = new DisposableArray<MD2Vertex>(FrameCount * VertexCount, _allocator);
 			// two vectors, 16 chars of text and numVerts of struct MD2Vertex
 			if (frameSize < 3 * 2 + 16 + default(MD2Vertex).Size * VertexCount)
 				throw new IOException("Invalid frame size specified");
@@ -87,7 +82,7 @@ namespace MD2Viewer
 			for (var i = 0; i < FrameCount; i++)
 			{
 				var frame = new MD2Frame();
-				frame.Vertices = new Memory<MD2Vertex>(_frameBackingArray, i * VertexCount, VertexCount);
+				frame.StartVertex = i * VertexCount;
 
 				Span<byte> frameData = stackalloc byte[frameSize];
 				EnsureRead(stream, frameData);
@@ -100,7 +95,7 @@ namespace MD2Viewer
 
 				Span<byte> name = stackalloc byte[16];
 				EnsureRead(ms, name);
-				frame.Name = ReadNullTerminated(name);
+				frame.SetName(name);
 
 				for (var j = 0; j < VertexCount; j++)
 				{
@@ -115,6 +110,13 @@ namespace MD2Viewer
 			ms.Dispose();
 		}
 
+		public Span<MD2Vertex> GetVertices(int frameIndex) =>
+			GetVertices(_frames[frameIndex]);
+
+		public Span<MD2Vertex> GetVertices(MD2Frame frame) =>
+			_frameBackingArray.AsSpan().Slice(frame.StartVertex, VertexCount);
+
+
 		private int ReadIntLE(ReadOnlySpan<byte> bytes, ref int offset)
 		{
 			offset += 4;
@@ -126,8 +128,8 @@ namespace MD2Viewer
 		{
 			if (_isDisposed) return;
 			_isDisposed = true;
-			_allocator.Return(_frames);
-			_allocator.Return(_frameBackingArray);
+			_frames.Dispose();
+			_frameBackingArray.Dispose();
 			Skins.Dispose();
 			TextureCoords.Dispose();
 			Triangles.Dispose();

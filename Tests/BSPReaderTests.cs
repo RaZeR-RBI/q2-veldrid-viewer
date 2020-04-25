@@ -18,9 +18,9 @@ namespace Tests
 			try
 			{
 				stream = File.OpenRead("box.bsp");
-				var bsp = new BSPFile(stream, SharedArrayPoolAllocator.Instance);
+				var bsp = new BSPFile(stream, DirectHeapMemoryAllocator.Instance);
 				var reader = new BSPReader(bsp);
-				var worldspawn = reader.GetModels().First();
+				var worldspawn = reader.GetModels()[0];
 				var data = new List<(LFace face, Entry<VertexNTL>[] vertices)>();
 				reader.ProcessVertices(
 					worldspawn,

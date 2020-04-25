@@ -88,21 +88,20 @@ namespace Q2Viewer
 		private readonly Texture _skybox;
 		private readonly GraphicsDevice _gd;
 
-		public BSPRenderer(BSPFile file, IArrayAllocator allocator, GraphicsDevice gd, IFileSystem fs)
+		public BSPRenderer(BSPFile file, IArrayAllocator arrAlloc, IMemoryAllocator memAlloc, GraphicsDevice gd, IFileSystem fs)
 		{
 			var sw = new Stopwatch();
 			_file = file;
 			_reader = new BSPReader(file);
-			_allocator = allocator;
+			_allocator = arrAlloc;
 			_gd = gd;
 			_lm = new LightmapAllocator(_gd, _allocator);
 
 			sw.Start();
-			_texPool = new TexturePool(gd, fs, allocator);
-			var textureNames = _file.TextureInfos.Data
-				.Where(t => t.TextureName != null)
-				.Select(t => t.TextureName?.ToLowerInvariant())
-				.Distinct();
+			_texPool = new TexturePool(gd, fs, memAlloc, arrAlloc);
+			var textureNames = new HashSet<string>();
+			foreach (var ti in _file.TextureInfos.Data)
+				textureNames.Add(ti.GetName().ToLowerInvariant());
 
 			foreach (var name in textureNames)
 				_texPool.LoadMapTexture(name);
@@ -149,6 +148,8 @@ namespace Q2Viewer
 				modelIndex++;
 			}
 			Log.Debug($"Total models: {_models.Count}");
+
+			_reader.File.Dispose();
 		}
 
 		private string GetSkyTextureName()
@@ -188,7 +189,7 @@ namespace Q2Viewer
 					ref var face = ref _file.Faces.Data[i];
 					ref var tex = ref _file.TextureInfos.Data[face.TextureInfoId];
 					return (
-						TextureName: tex.TextureName.ToLowerInvariant(),
+						TextureName: tex.GetName().ToLowerInvariant(),
 						Flags: tex.Flags,
 						LightmapStyles: face.LightmapStyles);
 				});
@@ -262,6 +263,7 @@ namespace Q2Viewer
 				tfg.Bounds = new AABB(min, max);
 
 				_gd.UpdateBuffer(mri.Buffer, vertices, count, VertexNTL.SizeInBytes, bufferOffset);
+				_allocator.Return(vertices);
 				mri.FaceGroups[tfgId] = tfg;
 				tfgId++;
 				bufferOffset += count;

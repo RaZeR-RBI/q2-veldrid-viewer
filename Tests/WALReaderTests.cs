@@ -15,7 +15,7 @@ namespace Tests
 			try
 			{
 				stream = File.OpenRead("clip.wal");
-				var wal = WALReader.ReadWAL(stream, SharedArrayPoolAllocator.Instance);
+				var wal = WALReader.ReadWAL(stream, SharedArrayPoolAllocator.Instance, DirectHeapMemoryAllocator.Instance);
 
 				wal.Width.Should().Be(32);
 				wal.Height.Should().Be(32);
@@ -39,7 +39,12 @@ namespace Tests
 									new byte[]{0x36, 0x10, 0x36, 0x85}};
 
 				for (int i = 0; i < 4; i++)
-					wal.Mips[i].Pixels.Should().StartWith(first_4_pixels[i]);
+				{
+					wal.Mips[i].Pixels[0].Should().Be(first_4_pixels[i][0]);
+					wal.Mips[i].Pixels[1].Should().Be(first_4_pixels[i][1]);
+					wal.Mips[i].Pixels[2].Should().Be(first_4_pixels[i][2]);
+					wal.Mips[i].Pixels[3].Should().Be(first_4_pixels[i][3]);
+				}
 			}
 			finally
 			{

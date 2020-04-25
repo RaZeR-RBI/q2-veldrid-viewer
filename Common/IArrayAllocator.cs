@@ -4,5 +4,6 @@ namespace Common
 	{
 		T[] Rent<T>(int size);
 		void Return<T>(T[] array);
+		int GetActiveAllocationsCount();
 	}
 }

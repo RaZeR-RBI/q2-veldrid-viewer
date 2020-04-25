@@ -34,7 +34,7 @@ namespace Q2Viewer
 
 		public readonly string EntitiesString;
 
-		public BSPFile(Stream stream, IArrayAllocator allocator)
+		public BSPFile(Stream stream, IMemoryAllocator allocator)
 		{
 			Span<byte> headerBytes = stackalloc byte[HeaderSize];
 			EnsureRead(stream, headerBytes);
@@ -69,7 +69,7 @@ namespace Q2Viewer
 			AreaPortals = new Lump<LAreaPortal>(allocator);
 
 			ReadData(headerBytes.Slice(8), stream);
-			EntitiesString = Encoding.UTF8.GetString(Entities.RawData, 0, Entities.Length);
+			EntitiesString = Encoding.UTF8.GetString(Entities.RawData);
 		}
 
 		private void ReadData(ReadOnlySpan<byte> lumps, Stream stream)

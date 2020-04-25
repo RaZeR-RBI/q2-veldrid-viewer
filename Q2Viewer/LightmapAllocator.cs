@@ -119,7 +119,7 @@ namespace Q2Viewer
 
 		public void AllocateBlock(
 			int numMaps,
-			byte[] data,
+			Span<byte> data,
 			int offset,
 			Vector2i extents,
 			out Vector2 position,

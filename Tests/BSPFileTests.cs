@@ -15,7 +15,7 @@ namespace Tests
 			try
 			{
 				stream = File.OpenRead("box.bsp");
-				var bsp = new BSPFile(stream, SharedArrayPoolAllocator.Instance);
+				var bsp = new BSPFile(stream, DirectHeapMemoryAllocator.Instance);
 				var expectedEntities = "{\n\"_tb_textures\" \"textures/e1u1\"\n\"classname\" \"worldspawn\"\n}\n{\n\"origin\" \"-0 -0 40\"\n\"classname\" \"info_player_start\"\n}\n{\n\"origin\" \"-40 -40 88\"\n\"classname\" \"light\"\n}\n\0";
 
 				bsp.EntitiesString.Should().Be(expectedEntities);
@@ -37,11 +37,11 @@ namespace Tests
 				bsp.TextureInfos.Length.Should().Be(6);
 				bsp.Visibility.Length.Should().Be(44); // in bytes
 
-				bsp.TextureInfos.Data.Should().Contain(
-					t => t.TextureName == "e1u1/floor3_1"
+				bsp.TextureInfos.Data.ToArray().Should().Contain(
+					t => t.GetName() == "e1u1/floor3_1"
 				);
-				bsp.TextureInfos.Data.Should().Contain(
-					t => t.TextureName == "e1u1/c_met7_1"
+				bsp.TextureInfos.Data.ToArray().Should().Contain(
+					t => t.GetName() == "e1u1/c_met7_1"
 				);
 			}
 			finally

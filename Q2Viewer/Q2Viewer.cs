@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Numerics;
@@ -72,11 +73,18 @@ namespace Q2Viewer
 			_debugPrimitives = new DebugPrimitives(Graphics, _viewBuf, _projBuf, _camera);
 			_modelRenderer = new ModelRenderer(Graphics, _viewBuf, _projBuf, _camera);
 
+			var memAlloc = DirectHeapMemoryAllocator.Instance;
+			var arrAlloc = SharedArrayPoolAllocator.Instance;
+
 			using (var bspFileStream = System.IO.File.OpenRead(_options.MapPath))
 			{
-				var bspFile = new BSPFile(bspFileStream, SharedArrayPoolAllocator.Instance);
-				_renderer = new BSPRenderer(bspFile, SharedArrayPoolAllocator.Instance, Graphics, _fs);
+				var bspFile = new BSPFile(bspFileStream, memAlloc);
+				_renderer = new BSPRenderer(bspFile, arrAlloc, memAlloc, Graphics, _fs);
 			}
+
+			Debug.WriteLine(string.Format("Active allocations: {0} (unmanaged), {1} (pooled)",
+				memAlloc.GetActiveAllocationsCount(),
+				arrAlloc.GetActiveAllocationsCount()));
 		}
 
 		protected override void Update(TimeSpan frameTime)

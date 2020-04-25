@@ -151,16 +151,28 @@ namespace Common
 		NoDraw = 0x80,
 	}
 
-	public struct LTextureInfo : ILumpData
+	public unsafe struct LTextureInfo : ILumpData
 	{
+		private const int c_nameSize = 32;
+
 		public Vector4 S;
 		public Vector4 T;
 		public SurfaceFlags Flags;
 		public int Value;
-		public string TextureName; // up to 32 chars
+		private fixed byte _texName[c_nameSize];
 		public int NextTextureInfoId;
 
 		public int Size => (4 * 4) + (4 * 4) + 4 + 4 + 32 + 4;
+
+		public Span<byte> NameSpan()
+		{
+			fixed (byte* ptr = _texName)
+			{
+				return new Span<byte>(ptr, c_nameSize);
+			}
+		}
+
+		public string GetName() => ReadNullTerminated(NameSpan());
 
 		public override bool Equals(object obj)
 		{
@@ -169,13 +181,13 @@ namespace Common
 				   T.Equals(info.T) &&
 				   Flags == info.Flags &&
 				   Value == info.Value &&
-				   TextureName == info.TextureName &&
+				   NameSpan().SequenceEqual(info.NameSpan()) &&
 				   NextTextureInfoId == info.NextTextureInfoId;
 		}
 
 		public override int GetHashCode()
 		{
-			return HashCode.Combine(S, T, Flags, Value, TextureName, NextTextureInfoId);
+			return HashCode.Combine(S, T, Flags, Value, NameSpan().GetHashCode(), NextTextureInfoId);
 		}
 
 		public void Read(ReadOnlySpan<byte> bytes)
@@ -184,7 +196,10 @@ namespace Common
 			T = ReadVector4(bytes.Slice(16));
 			Flags = (SurfaceFlags)ReadInt32LittleEndian(bytes.Slice(32));
 			Value = ReadInt32LittleEndian(bytes.Slice(36));
-			TextureName = ReadNullTerminated(bytes.Slice(40, 32));
+			fixed (byte* ptr = _texName)
+			{
+				bytes.Slice(40, 32).CopyTo(new Span<byte>(ptr, c_nameSize));
+			}
 			NextTextureInfoId = ReadInt32LittleEndian(bytes.Slice(72));
 		}
 	}

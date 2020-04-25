@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Numerics;
 using Common;
 using Imagini;
@@ -59,18 +60,26 @@ namespace MD2Viewer
 			_viewBuf = rf.CreateBuffer(new BufferDescription(64, BufferUsage.UniformBuffer | BufferUsage.Dynamic));
 			_projBuf = rf.CreateBuffer(new BufferDescription(64, BufferUsage.UniformBuffer | BufferUsage.Dynamic));
 
+			var memAlloc = DirectHeapMemoryAllocator.Instance;
+			var arrAlloc = SharedArrayPoolAllocator.Instance;
+
 			using (var md2FileStream = System.IO.File.OpenRead(_options.ModelPath))
 			{
-				var md2File = new MD2File(md2FileStream, SharedArrayPoolAllocator.Instance);
+				var md2File = new MD2File(md2FileStream, memAlloc);
 				_renderer = new MD2Renderer(
 					Graphics,
 					_fs,
 					md2File,
+					memAlloc,
 					SharedArrayPoolAllocator.Instance,
 					_viewBuf,
 					_projBuf,
 					_camera);
 			}
+
+			Debug.WriteLine(string.Format("Active allocations: {0} (unmanaged), {1} (pooled)",
+				memAlloc.GetActiveAllocationsCount(),
+				arrAlloc.GetActiveAllocationsCount()));
 		}
 
 		protected override void Update(TimeSpan frameTime)

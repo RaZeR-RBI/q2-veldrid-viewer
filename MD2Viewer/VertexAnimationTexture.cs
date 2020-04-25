@@ -9,16 +9,15 @@ namespace MD2Viewer
 {
 	public struct VATDescription
 	{
-		public string FrameName;
 		public float Time;
 	}
 
 	public static class VertexAnimationTexture
 	{
-		public static VATDescription[] CreateVAT(
+		public static DisposableArray<VATDescription> CreateVAT(
 			GraphicsDevice gd,
 			MD2Reader reader,
-			IArrayAllocator allocator,
+			IMemoryAllocator allocator,
 			out Texture positionTex,
 			out Texture normalTex,
 			out Vector3 translate,
@@ -26,14 +25,14 @@ namespace MD2Viewer
 		{
 			var model = reader.File;
 			var frameCount = model.FrameCount;
-			var result = allocator.Rent<VATDescription>(frameCount);
+			var result = new DisposableArray<VATDescription>(frameCount, allocator);
 			var vertexCount = model.Triangles.Length * 3;
 
 			var min = new Vector3(float.MaxValue);
 			var max = new Vector3(float.MinValue);
 
-			var ppix = allocator.Rent<ColorRGBA16>(vertexCount * frameCount);
-			var npix = allocator.Rent<ColorRGBA>(vertexCount * frameCount);
+			var ppix = new DisposableArray<ColorRGBA16>(vertexCount * frameCount, allocator);
+			var npix = new DisposableArray<ColorRGBA>(vertexCount * frameCount, allocator);
 
 
 			foreach (var frame in reader.GetFrames())
@@ -75,20 +74,20 @@ namespace MD2Viewer
 					result[frameIndex] = new VATDescription()
 					{
 						Time = frameIndex * frameStep,
-						FrameName = frame.Name
 					};
 					offset += vertexCount;
 					frameIndex++;
 				});
 			}
-			positionTex = CreateTexture(gd, vertexCount, frameCount, ppix, PixelFormat.R16_G16_B16_A16_UNorm);
-			normalTex = CreateTexture(gd, vertexCount, frameCount, npix, PixelFormat.R8_G8_B8_A8_UNorm);
-			allocator.Return(ppix);
-			allocator.Return(npix);
+			positionTex = CreateTexture(gd, vertexCount, frameCount, ppix.AsReadOnlySpan(), PixelFormat.R16_G16_B16_A16_UNorm);
+			normalTex = CreateTexture(gd, vertexCount, frameCount, npix.AsReadOnlySpan(), PixelFormat.R8_G8_B8_A8_UNorm);
+
+			ppix.Dispose();
+			npix.Dispose();
 			return result;
 		}
 
-		private static Texture CreateTexture<T>(GraphicsDevice device, int width, int height, T[] data, PixelFormat format)
+		private static Texture CreateTexture<T>(GraphicsDevice device, int width, int height, ReadOnlySpan<T> data, PixelFormat format)
 			where T : unmanaged
 		{
 			var rf = device.ResourceFactory;

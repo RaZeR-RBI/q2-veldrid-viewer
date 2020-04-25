@@ -12,9 +12,6 @@ namespace MD2Viewer
 {
 	public class MD2Renderer
 	{
-		public readonly MD2File File;
-		public readonly MD2Reader Reader;
-		private readonly IArrayAllocator _allocator;
 		private readonly GraphicsDevice _gd;
 
 		private readonly TexturePool _texPool;
@@ -53,7 +50,7 @@ namespace MD2Viewer
 
 		private readonly Texture _vatPositionTex;
 		private readonly Texture _vatNormalTex;
-		private readonly VATDescription[] _vatFrames;
+		private readonly DisposableArray<VATDescription> _vatFrames;
 
 		private struct ShaderParameters
 		{
@@ -70,15 +67,14 @@ namespace MD2Viewer
 			GraphicsDevice gd,
 			IFileSystem fileSystem,
 			MD2File file,
-			IArrayAllocator allocator,
+			IMemoryAllocator memAlloc,
+			IArrayAllocator arrAlloc,
 			DeviceBuffer viewBuf,
 			DeviceBuffer projBuf,
 			Camera camera)
 		{
-			File = file;
-			_allocator = allocator;
 			_gd = gd;
-			Reader = new MD2Reader(File, _allocator);
+			var reader = new MD2Reader(file, memAlloc);
 
 			var rf = _gd.ResourceFactory;
 			_worldBuffer = rf.CreateBuffer(new BufferDescription(64, BufferUsage.UniformBuffer | BufferUsage.Dynamic));
@@ -89,8 +85,8 @@ namespace MD2Viewer
 			Matrix4x4.Invert(Matrix4x4.Identity, out Matrix4x4 worldInverted);
 			_gd.UpdateBuffer(_worldITBuffer, 0, Matrix4x4.Transpose(worldInverted));
 
-			_vertexCount = (uint)File.Triangles.Length * 3;
-			var frame = Reader.GetFrames().First();
+			_vertexCount = (uint)file.Triangles.Length * 3;
+			var frame = reader.GetFrames()[0];
 #if false
 			_vertices = rf.CreateBuffer(new BufferDescription(
 				_vertexCount * VertexNT.SizeInBytes, BufferUsage.VertexBuffer
@@ -104,8 +100,8 @@ namespace MD2Viewer
 			_vertices = rf.CreateBuffer(new BufferDescription(
 				_vertexCount * VATVertex.SizeInBytes, BufferUsage.VertexBuffer
 			));
-			var vertData = allocator.Rent<VATVertex>((int)_vertexCount);
-			Reader.ProcessFrame(frame, (name, data) =>
+			var vertData = new DisposableArray<VATVertex>((int)_vertexCount, memAlloc);
+			reader.ProcessFrame(frame, (name, data) =>
 			{
 				for (var i = 0; i < _vertexCount; i++)
 					vertData[i] = new VATVertex()
@@ -114,8 +110,8 @@ namespace MD2Viewer
 						UV = data[i].UV
 					};
 			});
-			_gd.UpdateBuffer(_vertices, vertData, _vertexCount, VATVertex.SizeInBytes);
-			allocator.Return(vertData);
+			_gd.UpdateBuffer(_vertices, vertData.AsSpan());
+			vertData.Dispose();
 #endif
 			var shaderSet = new ShaderSetDescription(
 				new[] {
@@ -172,10 +168,10 @@ namespace MD2Viewer
 				_paramsBuffer
 			));
 
-			_texPool = new TexturePool(gd, fileSystem, allocator);
+			_texPool = new TexturePool(gd, fileSystem, memAlloc, arrAlloc);
 			for (var i = 0; i < file.Skins.Length; i++)
 			{
-				var path = file.Skins.Data[i].Path;
+				var path = file.Skins.Data[i].GetPath();
 				var skinTex = _texPool.LoadAbsolute(path);
 				if (skinTex == null)
 				{
@@ -189,8 +185,8 @@ namespace MD2Viewer
 
 			_vatFrames = VertexAnimationTexture.CreateVAT(
 				_gd,
-				Reader,
-				allocator,
+				reader,
+				memAlloc,
 				out _vatPositionTex,
 				out _vatNormalTex,
 				out Vector3 translate,
@@ -208,11 +204,13 @@ namespace MD2Viewer
 				_vatNormalTex,
 				_gd.LinearSampler
 			));
+
+			reader.Dispose();
 		}
 
 		public void Update(float deltaSeconds)
 		{
-			var maxTime = (float)File.FrameCount * 0.1f;
+			var maxTime = (float)_vatFrames.Length * 0.1f;
 			var step = 1f / maxTime;
 			var time = _shaderParams.Time.X + step * deltaSeconds;
 			if (time > 1.0f) time -= 1.0f;

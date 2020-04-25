@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.InteropServices;
 using Veldrid;
 
 namespace Common
@@ -29,6 +30,16 @@ namespace Common
 				{
 					gd.UpdateBuffer(buffer, 0, (IntPtr)p, (uint)sizeof(T) * (uint)data.Length);
 				}
+			}
+		}
+
+		public unsafe static void UpdateTexture<T>(this GraphicsDevice gd, Texture texture, ReadOnlySpan<T> data, uint x, uint y, uint z, uint width, uint height, uint depth, uint mipLevel, uint arrayLayer)
+			where T : unmanaged
+		{
+			uint sizeInBytes = (uint)(sizeof(T) * data.Length);
+			fixed (T* ptr = &data.GetPinnableReference())
+			{
+				gd.UpdateTexture(texture, (IntPtr)ptr, sizeInBytes, x, y, z, width, height, depth, mipLevel, arrayLayer);
 			}
 		}
 	}

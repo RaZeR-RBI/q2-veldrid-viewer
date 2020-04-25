@@ -11,20 +11,20 @@ namespace Common
 		void Read(ReadOnlySpan<byte> bytes);
 	}
 
-	public class Lump<T> : IDisposable where T : ILumpData, new()
+	public class Lump<T> : IDisposable where T : unmanaged, ILumpData
 	{
-		protected readonly IArrayAllocator _allocator;
+		protected readonly IMemoryAllocator _allocator;
 
-		protected byte[] _rawData = null;
-		protected T[] _data = null;
+		protected DisposableArray<byte> _rawData = DisposableArray<byte>.Null;
+		protected DisposableArray<T> _data = DisposableArray<T>.Null;
 
-		public T[] Data => _data;
-		public byte[] RawData => _rawData;
+		public Span<T> Data => _data;
+		public Span<byte> RawData => _rawData;
 
 		public bool IsRawData { get; private set; }
 		public int Length { get; private set; }
 
-		public Lump(IArrayAllocator allocator)
+		public Lump(IMemoryAllocator allocator)
 		{
 			_allocator = allocator;
 			IsRawData = (new T()).Size < 1;
@@ -46,21 +46,23 @@ namespace Common
 
 		protected void ReadRaw(Stream stream, int length)
 		{
-			_rawData = _allocator.Rent<byte>(length);
+			_rawData = new DisposableArray<byte>(length, _allocator);
 			Length = length;
-			var ms = new MemoryStream(_rawData);
 			Span<byte> buffer = stackalloc byte[4096];
 			var total = 0;
+			var offset = 0;
+			Span<byte> target = _rawData;
 			while (true)
 			{
 				var bytesRead = stream.Read(buffer);
 				total += bytesRead;
 				if (total > length)
 					bytesRead -= (total - length);
-				ms.Write(buffer.Slice(0, Math.Min(bytesRead, length)));
+				var count = Math.Min(bytesRead, length);
+				buffer.Slice(0, count).CopyTo(target.Slice(offset));
+				offset += count;
 				if (bytesRead < 4096) break;
 			}
-			ms.Dispose();
 		}
 
 		protected void ReadSerialized(Stream stream, int lengthInBytes)
@@ -74,13 +76,14 @@ namespace Common
 			}
 			Length = lengthInBytes / size;
 			Span<byte> buffer = stackalloc byte[size];
-			_data = _allocator.Rent<T>(Length);
+			_data = new DisposableArray<T>(Length, _allocator);
+			Span<T> target = _data;
 			for (int i = 0; i < Length; i++)
 			{
 				EnsureRead(stream, buffer);
 				var item = new T();
 				item.Read(buffer);
-				_data[i] = item;
+				target[i] = item;
 			}
 		}
 
@@ -89,16 +92,8 @@ namespace Common
 		{
 			if (_isDisposed) return;
 			_isDisposed = true;
-			if (_data != null)
-			{
-				_allocator.Return(_data);
-				_data = null;
-			}
-			if (_rawData != null)
-			{
-				_allocator.Return(_rawData);
-				_rawData = null;
-			}
+			if (!_data.IsNull()) _data.Dispose();
+			if (!_rawData.IsNull()) _rawData.Dispose();
 			Length = 0;
 		}
 	}

@@ -117,7 +117,7 @@ namespace Common
 			{
 				newStream.Dispose();
 				throw new IOException(
-					string.Format("Unable to read {} bytes starting from {}",
+					string.Format("Unable to read {0} bytes starting from {1}",
 						entry.Offset, entry.Size), ex);
 			}
 			newStream.Seek(0, SeekOrigin.Begin);

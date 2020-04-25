@@ -1,25 +1,41 @@
 using System;
 using System.Numerics;
+using System.Runtime.InteropServices;
 using static System.Buffers.Binary.BinaryPrimitives;
 using static Common.Util;
 
 namespace Common
 {
-	public struct MD2Skin : ILumpData
+	public unsafe struct MD2Skin : ILumpData
 	{
-		public string Path; // max 64 chars
+		private const int c_pathSize = 64;
+
+		fixed byte _path[c_pathSize];
+
+		public string GetPath()
+		{
+			fixed (byte* ptr = _path)
+			{
+				return ReadNullTerminated(new Span<byte>(ptr, c_pathSize));
+			}
+		}
 
 		public int Size => 64;
 
 		public void Read(ReadOnlySpan<byte> bytes)
 		{
-			Path = ReadNullTerminated(bytes.Slice(0, 64));
+			fixed (byte* ptr = _path)
+			{
+				var target = new Span<byte>(ptr, c_pathSize);
+				bytes.Slice(0, c_pathSize).CopyTo(target);
+			}
 		}
 	}
 
 	public struct MD2TexCoord : ILumpData
 	{
 		public short S;
+
 		public short T;
 
 		public int Size => 2 * 2;
@@ -76,11 +92,30 @@ namespace Common
 		}
 	}
 
-	public struct MD2Frame
+	public unsafe struct MD2Frame
 	{
+		private const int c_maxChars = 16;
 		public Vector3 Scale;
 		public Vector3 Translate;
-		public string Name; // max 16 chars
-		public Memory<MD2Vertex> Vertices;
+
+		private fixed byte _name[c_maxChars];
+
+		public string GetName()
+		{
+			fixed (byte* ptr = _name)
+			{
+				return ReadNullTerminated(new Span<byte>(ptr, c_maxChars));
+			}
+		}
+
+		public void SetName(Span<byte> chars)
+		{
+			fixed (byte* ptr = _name)
+			{
+				chars.Slice(0, c_maxChars).CopyTo(new Span<byte>(ptr, c_maxChars));
+			}
+		}
+
+		public int StartVertex;
 	}
 }

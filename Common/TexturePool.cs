@@ -21,12 +21,13 @@ namespace Common
 		private readonly List<Texture> _allTextures = new List<Texture>();
 
 		private readonly GraphicsDevice _gd;
-		private readonly IArrayAllocator _allocator;
+		private readonly IMemoryAllocator _memAlloc;
+		private readonly IArrayAllocator _arrAlloc;
 		private readonly IFileSystem _fs;
 
-		public TexturePool(GraphicsDevice gd, IFileSystem fs, IArrayAllocator allocator)
+		public TexturePool(GraphicsDevice gd, IFileSystem fs, IMemoryAllocator memAlloc, IArrayAllocator arrAlloc)
 		{
-			(_gd, _allocator, _fs) = (gd, allocator, fs);
+			(_gd, _memAlloc, _arrAlloc, _fs) = (gd, memAlloc, arrAlloc, fs);
 			CreateFallbackTexture();
 		}
 
@@ -77,17 +78,16 @@ namespace Common
 		private Texture LoadPCX(FileSystemPath path)
 		{
 			using (var file = _fs.OpenFile(path, FileAccess.Read))
+			using (var pcxTex = PCXReader.ReadPCX(file, _memAlloc))
 			{
-				var pcxTex = PCXReader.ReadPCX(file, _allocator);
 				var pixelCount = pcxTex.Width * pcxTex.Height;
 				var palette = pcxTex.Palette;
-				var pixels = _allocator.Rent<ColorRGBA>(pixelCount);
+				var pixels = new DisposableArray<ColorRGBA>(pixelCount, _memAlloc);
 				var indexes = pcxTex.Pixels;
 				for (var i = 0; i < pixelCount; i++)
 					pixels[i] = palette[indexes[i]];
-				var texture = CreateTexture(pcxTex.Width, pcxTex.Height, pixels, path.ToString());
-				_allocator.Return(pixels);
-				pcxTex.DisposePixelData();
+				var texture = CreateTexture(pcxTex.Width, pcxTex.Height, pixels.AsSpan(), path.ToString());
+				pixels.Dispose();
 				return texture;
 			}
 		}
@@ -95,28 +95,27 @@ namespace Common
 		private Texture LoadWAL(FileSystemPath path)
 		{
 			using (var file = _fs.OpenFile(path, FileAccess.Read))
+			using (var walTex = WALReader.ReadWAL(file, _arrAlloc, _memAlloc))
 			{
-				var walTex = WALReader.ReadWAL(file, _allocator);
 				var pixelCount = walTex.Width * walTex.Height;
-				var pixels = _allocator.Rent<ColorRGBA>(pixelCount);
+				var pixels = new DisposableArray<ColorRGBA>(pixelCount, _memAlloc);
 				var indexes = walTex.Mips[0].Pixels;
 				for (var i = 0; i < pixelCount; i++)
 					pixels[i] = QuakePalette.Colors[indexes[i]];
-				var texture = CreateTexture(walTex.Width, walTex.Height, pixels, path.ToString());
-				_allocator.Return(pixels);
-				walTex.DisposePixelData();
+				var texture = CreateTexture(walTex.Width, walTex.Height, pixels.AsSpan(), path.ToString());
+				pixels.Dispose();
 				return texture;
 			}
 		}
 
-		private Texture CreateTexture(int width, int height, ColorRGBA[] pixels, string name = null)
+		private Texture CreateTexture(int width, int height, ReadOnlySpan<ColorRGBA> pixels, string name = null)
 		{
 			var texture = TexturePool.CreateTexture(_gd, width, height, pixels, name);
 			_allTextures.Add(texture);
 			return texture;
 		}
 
-		public static Texture CreateTexture(GraphicsDevice device, int width, int height, ColorRGBA[] pixels, string name = null, uint layers = 1, TextureUsage usageFlags = 0)
+		public static Texture CreateTexture(GraphicsDevice device, int width, int height, ReadOnlySpan<ColorRGBA> pixels, string name = null, uint layers = 1, TextureUsage usageFlags = 0)
 		{
 			var genMipmaps = (width > 1 && height > 1);
 			var usage = TextureUsage.Sampled;
@@ -142,13 +141,13 @@ namespace Common
 			return texture;
 		}
 
-		public static Texture CreateFallbackTexture(GraphicsDevice device, IArrayAllocator _allocator)
+		public static Texture CreateFallbackTexture(GraphicsDevice device, IMemoryAllocator memAlloc)
 		{
 			var O = new ColorRGBA(100, 100, 100);
 			var X = new ColorRGBA(150, 150, 150);
 			var size = 256;
 			var gridStep = 8;
-			var pixels = _allocator.Rent<ColorRGBA>(size * size);
+			var pixels = new DisposableArray<ColorRGBA>(size * size, memAlloc);
 			for (var x = 0; x < size; x++)
 				for (var y = 0; y < size; y++)
 				{
@@ -161,13 +160,13 @@ namespace Common
 					pixels[index] = color;
 				}
 
-			var result = CreateTexture(device, size, size, pixels);
-			_allocator.Return(pixels);
+			var result = CreateTexture(device, size, size, pixels.AsSpan());
+			pixels.Dispose();
 			return result;
 		}
 
 		private void CreateFallbackTexture() =>
-			_fallbackTex = CreateFallbackTexture(_gd, _allocator);
+			_fallbackTex = CreateFallbackTexture(_gd, _memAlloc);
 
 		private static string[] s_envSuffixes = new[] {
 			"rt", "lf", "up", "dn", "ft", "bk"
@@ -181,11 +180,11 @@ namespace Common
 				if (!_fs.Exists(path(name, suffix)))
 					goto fallback;
 
-			var faces = _allocator.Rent<PCXTexture>(6);
+			var faces = _arrAlloc.Rent<PCXTexture>(6);
 			for (var i = 0; i < 6; i++)
 			{
 				var file = _fs.OpenFile(path(name, s_envSuffixes[i]), FileAccess.Read);
-				faces[i] = PCXReader.ReadPCX(file, _allocator);
+				faces[i] = PCXReader.ReadPCX(file, _memAlloc);
 				file.Close();
 			}
 			var widths = faces.Take(6).Select(f => f.Width).Distinct();
@@ -202,9 +201,9 @@ namespace Common
 				TextureType.Texture2D
 			));
 
-			var pixelCount = texture.Width * texture.Height;
-			var pixels = _allocator.Rent<ColorRGBA>((int)pixelCount);
-			var size = texture.Width;
+			var pixelCount = (int)(texture.Width * texture.Height);
+			var pixels = new DisposableArray<ColorRGBA>(pixelCount, _memAlloc);
+			var size = (int)texture.Width;
 			for (var f = 0; f < 6; f++)
 			{
 				var indexes = faces[f].Pixels;
@@ -229,10 +228,10 @@ namespace Common
 						}
 					}
 
-				_gd.UpdateTexture<ColorRGBA>(texture, pixels, 0, 0, 0, texture.Width, texture.Height, 1, 0, (uint)f);
+				_gd.UpdateTexture<ColorRGBA>(texture, pixels.AsSpan(), 0, 0, 0, texture.Width, texture.Height, 1, 0, (uint)f);
 			}
-			_allocator.Return(pixels);
-			_allocator.Return(faces);
+			pixels.Dispose();
+			_arrAlloc.Return(faces);
 			_allTextures.Add(texture);
 			return texture;
 
