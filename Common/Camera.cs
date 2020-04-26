@@ -1,8 +1,8 @@
 ﻿using System;
+using System.Drawing;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using Imagini;
-using Veldrid;
 
 using MB = Imagini.MouseButton;
 
@@ -25,7 +25,7 @@ namespace Common
 		private float _yaw;
 		private float _pitch;
 
-		private Vector2 _previousMousePos;
+		private bool _mouseCaptured = false;
 		private float _windowWidth;
 		private float _windowHeight;
 
@@ -98,9 +98,6 @@ namespace Common
 				UpdateViewMatrix();
 			}
 
-			Vector2 mouseDelta = InputTracker.MousePosition - _previousMousePos;
-			_previousMousePos = InputTracker.MousePosition;
-
 			var shouldUpdateView = false;
 			if (InputTracker.GetKey(Keycode.LEFT))
 			{
@@ -121,11 +118,23 @@ namespace Common
 
 			if (InputTracker.GetMouseButton(MB.Left) || InputTracker.GetMouseButton(MB.Right))
 			{
+				var mouseDelta = InputTracker.GetMousePosition();
+				if (!_mouseCaptured)
+				{
+					InputTracker.SetMouseCapture(true);
+					_mouseCaptured = true;
+					mouseDelta = new Point();
+				}
 				Yaw += -mouseDelta.X * 0.01f;
 				Pitch += -mouseDelta.Y * 0.01f;
 				Pitch = Clamp(Pitch, -1.55f, 1.55f);
 
 				shouldUpdateView = true;
+			}
+			else
+			{
+				InputTracker.SetMouseCapture(false);
+				_mouseCaptured = false;
 			}
 			if (shouldUpdateView)
 				UpdateViewMatrix();

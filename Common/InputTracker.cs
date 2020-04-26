@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Drawing;
 using System.Numerics;
 using Imagini;
 
@@ -14,15 +15,24 @@ namespace Common
 		private static HashSet<Keycode> _pressedKeys = new HashSet<Keycode>(10);
 		private static HashSet<MouseButton> _mouseButtons = new HashSet<MouseButton>(10);
 
+		private static AppBase _app;
+
 
 		public static void Connect(AppBase app)
 		{
+			_app = app;
 			app.Events.Keyboard.KeyPressed += OnKeyPressed;
 			app.Events.Keyboard.KeyReleased += OnKeyReleased;
 			app.Events.Mouse.MouseMoved += OnMouseMoved;
 			app.Events.Mouse.MouseButtonPressed += OnMouseButtonPressed;
 			app.Events.Mouse.MouseButtonReleased += OnMouseButtonReleased;
 		}
+
+		public static void SetMouseCapture(bool capture) => _app.CaptureMouse = capture;
+
+		public static bool IsMouseCaptured() => _app.CaptureMouse;
+
+		public static Point GetMousePosition() => _app.MousePosition;
 
 		public static void Disconnect(AppBase app)
 		{
@@ -57,7 +67,7 @@ namespace Common
 		private static void OnMouseMoved(object sender, MouseMoveEventArgs args)
 		{
 			MousePosition = new Vector2(args.X, args.Y);
-			MouseDelta = new Vector2(args.X, args.Y);
+			MouseDelta = new Vector2(args.RelativeX, args.RelativeY);
 		}
 
 		private static void OnMouseButtonPressed(object sender, MouseButtonEventArgs args) =>
