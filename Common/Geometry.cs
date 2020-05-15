@@ -41,7 +41,13 @@ namespace Common
 		// not sure if it's correct
 		public static int GetMaxHullCorners(int planeCount) => planeCount * (planeCount - 1);
 
-		public static int GetMaxVertsPerFaceForHull(int planeCount) => planeCount - 1;
+		public static int GetMaxVertsPerFaceForHull(int planeCount) => (planeCount - 1) * planeCount;
+
+		public static int GetMaxVertsForHull(int planeCount) =>
+			GetMaxVertsPerFaceForHull(planeCount) * planeCount;
+
+		public static int GetMaxTrianglesForHull(int planeCount) =>
+			(GetMaxVertsPerFaceForHull(planeCount) - 2) * planeCount;
 
 		public static void GetConvexHullPointCloud(ReadOnlySpan<Plane> planes, ref Span<Vector3> result, out int count, bool checks = true)
 		{
@@ -136,11 +142,14 @@ namespace Common
 		public static bool IsCCW(Vector3 a, Vector3 b, Vector3 center, Vector3 normal)
 		{
 			var cross = Vector3.Cross(center - a, center - b);
-			return Vector3.Dot(cross, normal) > c_margin;
+			return Vector3.Dot(cross, normal) <= c_margin;
 		}
 
 		public static int GetTriangleCount<T>(ReadOnlySpan<T> faceVerts) =>
 			faceVerts.Length - 2;
+
+		public static int GetTriangleCount(int vertexCount) =>
+			vertexCount - 2;
 
 		public static void Triangulate<T>(ReadOnlySpan<T> faceVerts,
 			Span<T> result)

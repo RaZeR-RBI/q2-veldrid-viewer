@@ -83,6 +83,8 @@ namespace Q2Viewer
 		private readonly List<(DeviceBuffer, uint)> _debugModels =
 			new List<(DeviceBuffer, uint)>();
 		private readonly List<ModelRenderInfo> _models = new List<ModelRenderInfo>();
+		private readonly List<(DeviceBuffer, uint)> _collisionModels =
+			new List<(DeviceBuffer, uint)>();
 
 		private readonly TexturePool _texPool;
 		private readonly Texture _skybox;
@@ -126,13 +128,20 @@ namespace Q2Viewer
 				}
 
 				// debugging stuff
-				sw.Restart();
-				var mb = BuildDebugModelBuffers(gd, model, out uint count);
-				sw.Stop();
-				Log.Debug($"Model #{modelIndex}: Created debug model in {FormatSW(sw)}");
-				if (mb != null)
 				{
-					_debugModels.Add((mb, count));
+					sw.Restart();
+					var mb = BuildDebugModelBuffers(gd, model, out uint count);
+					sw.Stop();
+					Log.Debug($"Model #{modelIndex}: Created debug model in {FormatSW(sw)}");
+					if (mb != null) _debugModels.Add((mb, count));
+				}
+
+				{
+					sw.Restart();
+					var cb = BuildDebugCollisionBuffers(gd, model, out uint count);
+					sw.Stop();
+					Log.Debug($"Model #{modelIndex}: Created collision debug model in {FormatSW(sw)}");
+					if (cb != null) _collisionModels.Add((cb, count));
 				}
 
 				sw.Restart();
@@ -348,6 +357,65 @@ namespace Q2Viewer
 			return buffer;
 		}
 
+		public DeviceBuffer BuildDebugCollisionBuffers(
+			GraphicsDevice gd,
+			LModel model,
+			out uint count
+		)
+		{
+			count = (uint)_reader.EnumerateBrushes(model)
+				.Select(b => Geometry.GetMaxTrianglesForHull(b.NumSides))
+				.Sum() * 3;
+
+			var vertices = _allocator.Rent<VertexColor>((int)count);
+			var offset = 0;
+			foreach (var brush in _reader.EnumerateBrushes(model))
+			{
+				var planes = _allocator.Rent<Plane>(brush.NumSides);
+				var faceVertPos = _allocator.Rent<Vector3>(Geometry.GetMaxVertsPerFaceForHull(brush.NumSides));
+				var faceVerts = _allocator.Rent<VertexColor>(faceVertPos.Length);
+				for (var i = brush.FirstSide; i < brush.FirstSide + brush.NumSides; i++)
+				{
+					var planeId = _file.BrushSides.Data[i].PlaneId;
+					planes[i - brush.FirstSide] = _file.Planes.Data[planeId].GetPlane();
+				}
+				var planeSlice = planes.AsSpan().Slice(0, brush.NumSides);
+				for (var i = 0; i < planeSlice.Length; i++)
+				{
+					var color = Util.GetRandomColor();
+					var fvp = faceVertPos.AsSpan();
+					Geometry.BuildConvexHullFace(planeSlice, i, ref fvp, out int vertexCount);
+					if (vertexCount <= 0) continue;
+
+					for (var j = 0; j < vertexCount; j++)
+						faceVerts[j] = new VertexColor(faceVertPos[j], color);
+
+					var triangulatedCount = Geometry.GetTriangleCount(vertexCount) * 3;
+					var triangulated = _allocator.Rent<VertexColor>(triangulatedCount);
+					Geometry.Triangulate(faceVerts.AsSpan().Slice(0, vertexCount), triangulated.AsSpan());
+					triangulated.AsSpan().Slice(0, triangulatedCount).CopyTo(vertices.AsSpan().Slice(offset));
+					offset += triangulatedCount;
+				}
+				_allocator.Return(planes);
+				_allocator.Return(faceVertPos);
+				_allocator.Return(faceVerts);
+			}
+			count = (uint)offset;
+
+			if (count == 0)
+			{
+				_allocator.Return(vertices);
+				return null;
+			}
+
+			var vertexSize = VertexColor.SizeInBytes;
+			var buffer = gd.ResourceFactory.CreateBuffer(
+				new BufferDescription(count * vertexSize, BufferUsage.VertexBuffer));
+			gd.UpdateBuffer(buffer, vertices, count, vertexSize);
+			_allocator.Return(vertices);
+			return buffer;
+		}
+
 		public int DrawWireframe(CommandList cl, DebugPrimitives helper)
 		{
 			var calls = 0;
@@ -363,6 +431,17 @@ namespace Q2Viewer
 		{
 			var calls = 0;
 			foreach (var (vb, count) in _debugModels)
+			{
+				helper.DrawTriangles(cl, Matrix4x4.Identity, vb, count);
+				calls++;
+			}
+			return calls;
+		}
+
+		public int DrawCollisionModels(CommandList cl, DebugPrimitives helper)
+		{
+			var calls = 0;
+			foreach (var (vb, count) in _collisionModels)
 			{
 				helper.DrawTriangles(cl, Matrix4x4.Identity, vb, count);
 				calls++;

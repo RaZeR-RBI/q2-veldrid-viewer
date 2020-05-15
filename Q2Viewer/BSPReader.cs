@@ -131,5 +131,48 @@ namespace Q2Viewer
 
 		public static int GetFaceVertexCount(LFace face) =>
 			3 + (face.EdgeCount - 3) * 3;
+
+		public IEnumerable<int> EnumerateLeafIndexes(LModel model)
+		{
+			var nodes = new Stack<int>();
+			if (model.HeadNode < 0)
+			{
+				yield return -1 - model.HeadNode;
+				yield break;
+			}
+			nodes.Push(model.HeadNode);
+			do
+			{
+				var index = nodes.Pop();
+				var node = File.Nodes.Data[index];
+
+				if (node.Children1 < 0)
+					yield return -1 - node.Children1;
+				else
+					nodes.Push(node.Children1);
+
+				if (node.Children2 < 0)
+					yield return -1 - node.Children2;
+				else
+					nodes.Push(node.Children2);
+
+			} while (nodes.Count > 0);
+		}
+
+		public IEnumerable<int> EnumerateBrushIndexes(LModel model)
+		{
+			foreach (var leafIndex in EnumerateLeafIndexes(model))
+			{
+				var leaf = File.Leaves.Data[leafIndex];
+				for (var i = leaf.FirstLeafBrush; i < leaf.FirstLeafBrush + leaf.NumLeafBrushes; i++)
+				{
+					var brushIndex = File.LeafBrushes.Data[i].Value;
+					yield return brushIndex;
+				}
+			}
+		}
+
+		public IEnumerable<LBrush> EnumerateBrushes(LModel model) =>
+			EnumerateBrushIndexes(model).Distinct().Select(i => File.Brushes.Data[i]);
 	}
 }

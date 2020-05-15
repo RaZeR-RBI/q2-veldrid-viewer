@@ -26,9 +26,16 @@ namespace Q2Viewer
 		private readonly Options _options;
 		private IFileSystem _fs;
 
-		private bool _showWireframe = false;
-		private bool _showColored = false;
 		private bool _showGizmo = false;
+		private bool _showWireframe = false;
+		private ViewMode _viewMode = ViewMode.Normal;
+
+		private enum ViewMode
+		{
+			Normal,
+			Colored,
+			Collision
+		}
 
 
 		public Q2Viewer(Options options) : base(
@@ -92,12 +99,16 @@ namespace Q2Viewer
 			var deltaSeconds = (float)frameTime.Ticks / TimeSpan.TicksPerSecond;
 			_camera.Update(deltaSeconds);
 
-			if (InputTracker.IsKeyTriggered(Keycode.NUMBER_1))
+			if (InputTracker.IsKeyTriggered(Keycode.f))
 				_showWireframe = !_showWireframe;
-			if (InputTracker.IsKeyTriggered(Keycode.NUMBER_2))
-				_showColored = !_showColored;
-			if (InputTracker.IsKeyTriggered(Keycode.NUMBER_3))
+			if (InputTracker.IsKeyTriggered(Keycode.g))
 				_showGizmo = !_showGizmo;
+			if (InputTracker.IsKeyTriggered(Keycode.NUMBER_1))
+				_viewMode = ViewMode.Normal;
+			if (InputTracker.IsKeyTriggered(Keycode.NUMBER_2))
+				_viewMode = ViewMode.Colored;
+			if (InputTracker.IsKeyTriggered(Keycode.NUMBER_3))
+				_viewMode = ViewMode.Collision;
 
 			_modelRenderer.Update(deltaSeconds);
 			InputTracker.AfterUpdate();
@@ -115,13 +126,22 @@ namespace Q2Viewer
 			var calls = 0;
 			if (_showGizmo)
 			{
-				_debugPrimitives.DrawGizmo(_cl); calls++;
+				_debugPrimitives.DrawGizmo(_cl);
+				calls++;
 			}
 
-			if (_showColored)
-				calls += _renderer.DrawDebugModels(_cl, _debugPrimitives);
-			else
-				calls += _renderer.Draw(_cl, _modelRenderer);
+			switch (_viewMode)
+			{
+				case ViewMode.Normal:
+					calls += _renderer.Draw(_cl, _modelRenderer);
+					break;
+				case ViewMode.Colored:
+					calls += _renderer.DrawDebugModels(_cl, _debugPrimitives);
+					break;
+				case ViewMode.Collision:
+					calls += _renderer.DrawCollisionModels(_cl, _debugPrimitives);
+					break;
+			}
 
 			if (_showWireframe)
 				calls += _renderer.DrawWireframe(_cl, _debugPrimitives);
