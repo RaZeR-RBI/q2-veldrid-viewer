@@ -156,7 +156,7 @@ namespace Q2Viewer
 				_wireframes.Add((wf, edgeCount));
 				modelIndex++;
 			}
-			Log.Debug($"Total models: {_models.Count}");
+			Log.Debug($"Visible models: {_models.Count}");
 
 			_reader.File.Dispose();
 		}
@@ -394,6 +394,7 @@ namespace Q2Viewer
 					var triangulated = _allocator.Rent<VertexColor>(triangulatedCount);
 					Geometry.Triangulate(faceVerts.AsSpan().Slice(0, vertexCount), triangulated.AsSpan());
 					triangulated.AsSpan().Slice(0, triangulatedCount).CopyTo(vertices.AsSpan().Slice(offset));
+					_allocator.Return(triangulated);
 					offset += triangulatedCount;
 				}
 				_allocator.Return(planes);
