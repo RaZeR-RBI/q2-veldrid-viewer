@@ -220,9 +220,9 @@ namespace Q2Viewer
 				_reader.ProcessVertices(group, (faceIndex, f, ev, tMin, tExt) =>
 				{
 
-					var triangleCount = BSPReader.GetFaceTriangleCount(ev);
+					var triangleCount = Geometry.GetTriangleCount<Entry<VertexNTL>>(ev);
 					Span<Entry<VertexNTL>> vt = stackalloc Entry<VertexNTL>[triangleCount * 3];
-					BSPReader.Triangulate(ev, vt);
+					Geometry.Triangulate(ev, vt);
 					foreach (var entry in vt)
 					{
 						var vertex = entry.Value;
@@ -324,9 +324,9 @@ namespace Q2Viewer
 				// skip triggers, clips and other invisible faces
 				if (!IsDrawable(texInfo.Flags))
 					return;
-				var triangleCount = BSPReader.GetFaceTriangleCount(v);
+				var triangleCount = Geometry.GetTriangleCount<Entry<VertexNTL>>(v);
 				Span<Entry<VertexNTL>> vt = stackalloc Entry<VertexNTL>[triangleCount * 3];
-				BSPReader.Triangulate(v, vt);
+				Geometry.Triangulate(v, vt);
 				Span<VertexColor> vc = stackalloc VertexColor[triangleCount * 3];
 				var color = Util.GetRandomColor();
 				for (var i = 0; i < vt.Length; i++)

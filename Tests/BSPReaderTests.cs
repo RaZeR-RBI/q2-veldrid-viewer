@@ -31,9 +31,9 @@ namespace Tests
 				var pair = data.First();
 				var face = pair.face;
 				var srcVerts = pair.vertices;
-				var triangleCount = BSPReader.GetFaceTriangleCount(srcVerts);
+				var triangleCount = Geometry.GetTriangleCount<Entry<VertexNTL>>(srcVerts);
 				Span<Entry<VertexNTL>> dstVerts = stackalloc Entry<VertexNTL>[triangleCount * 3];
-				BSPReader.Triangulate(srcVerts, dstVerts);
+				Geometry.Triangulate(srcVerts, dstVerts);
 				Span<int> indices = stackalloc int[triangleCount * 3];
 				for (var i = 0; i < dstVerts.Length; i++)
 					indices[i] = dstVerts[i].Index;

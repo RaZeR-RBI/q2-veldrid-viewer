@@ -9,6 +9,8 @@ namespace Q2Viewer
 {
 	public delegate void FaceVisitorCallback(int faceIndex, LFace data, Span<Entry<VertexNTL>> vertices, Vector2i textureMins, Vector2i extents);
 
+	public delegate void BrushVisitorCallback(LBrush brush, Span<Plane> planes);
+
 	public struct Entry<T>
 	{
 		public int Index;
@@ -26,6 +28,7 @@ namespace Q2Viewer
 		public const int LightmapSize = 16;
 
 		public Span<LModel> GetModels() => File.Submodels.Data;
+		public Span<LBrush> GetBrushes() => File.Brushes.Data;
 
 		public void ProcessVertices(LModel model, FaceVisitorCallback callback) =>
 			ProcessVertices(Enumerable.Range(model.FirstFace, model.NumFaces), callback);
@@ -107,25 +110,26 @@ namespace Q2Viewer
 			return false;
 		}
 
+		public void ProcessBrush(int brushIndex, BrushVisitorCallback cb) =>
+			ProcessBrush(File.Brushes.Data[brushIndex], cb);
+
+		public void ProcessBrush(LBrush brush, BrushVisitorCallback cb)
+		{
+			var sides = brush.NumSides;
+			Span<Plane> planes = stackalloc Plane[sides];
+
+			for (var i = 0; i < sides; i++)
+			{
+				var bsIndex = brush.FirstSide + i;
+				var bs = File.BrushSides.Data[bsIndex];
+				var plane = File.Planes.Data[bs.PlaneId].GetPlane();
+				planes[i] = plane;
+			}
+
+			cb(brush, planes);
+		}
+
 		public static int GetFaceVertexCount(LFace face) =>
 			3 + (face.EdgeCount - 3) * 3;
-
-		public static int GetFaceTriangleCount(ReadOnlySpan<Entry<VertexNTL>> faceVerts) =>
-			faceVerts.Length - 2;
-
-		public static void Triangulate(ReadOnlySpan<Entry<VertexNTL>> faceVerts,
-			Span<Entry<VertexNTL>> result)
-		{
-			var count = faceVerts.Length - 2;
-			var root = faceVerts[0];
-			var offset = 1;
-			for (var i = 0; i < count * 3; i += 3)
-			{
-				result[i] = root;
-				result[i + 1] = faceVerts[offset];
-				result[i + 2] = faceVerts[offset + 1];
-				offset++;
-			}
-		}
 	}
 }

@@ -136,6 +136,8 @@ namespace Common
 			Distance = BitConverter.ToSingle(bytes.Slice(12));
 			Type = (PlaneType)ReadInt32LittleEndian(bytes.Slice(16));
 		}
+
+		public Plane GetPlane() => new Plane(Normal, Distance);
 	}
 
 	[Flags]
