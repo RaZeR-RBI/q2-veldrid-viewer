@@ -14,8 +14,13 @@ Supported map features:
 * Flowing textures
 * Skyboxes (PCX only)
 
+Camera controls:
+* W/A/S/D/Q/E to move
+* Arrow keys (or hold LMB/RMB) to rotate
+* Shift increases movement speed, Ctrl decreases it
+
 Hotkeys:
-* W: Show wireframe (including triggers)
+* F: Show wireframe (including triggers)
 * G: Show gizmo (three colored axes at origin)
 * 1: Normal mode
 * 2: Non-textured mode (randomly colored)
@@ -45,6 +50,8 @@ Note - the code is a little bit non-straightforward and non-idiomatic because it
 Loads and renders an animated MD2 model file. Frames are played sequentally.
 
 The frames are packed in to a texture (this technique is often called 'Vertex Animation Texture') and automatically interpolated by the GPU using linear sampling.
+
+Camera controls are the same as above.
 
 
 #### How to use:
