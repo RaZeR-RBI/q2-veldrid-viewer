@@ -549,7 +549,7 @@ namespace Common
 		public void Read(ReadOnlySpan<byte> bytes)
 		{
 			PlaneId = ReadUInt16LittleEndian(bytes);
-			TexInfoId = ReadInt16LittleEndian(bytes);
+			TexInfoId = ReadInt16LittleEndian(bytes.Slice(2));
 		}
 	}
 
