@@ -57,6 +57,7 @@ namespace Q2Viewer
 		private const int c_maxLightStyles = 256;
 		private static float[][] s_lightStyles = new[] {
 			"m",
+			"m",
 			"abcdefghijklmnopqrstuvwxyzyxwvutsrqponmlkjihgfedcba",
 			"mmmmmaaaaammmmmaaaaaabcdefgabcdefg",
 			"mamamamamama",
@@ -241,7 +242,7 @@ namespace Q2Viewer
 		}
 
 		private float _lmAnimTime = 0f;
-		private const float c_lmFrameTime = 0.01f;
+		private const float c_lmFrameTime = 0.1f;
 		private float _texScroll = 0f;
 		private const float c_texScrollSpeed = 40f / 64f;
 		private float _texWarp = 0f;
@@ -250,9 +251,9 @@ namespace Q2Viewer
 		public void Update(float deltaSeconds)
 		{
 			_lmAnimTime += deltaSeconds;
-			if (_lmAnimTime >= c_lmFrameTime)
+			while (_lmAnimTime >= c_lmFrameTime)
 			{
-				_lmAnimTime -= 0.01f;
+				_lmAnimTime -= c_lmFrameTime;
 				NextLightmapStyleFrame();
 			}
 			_texScroll += deltaSeconds * c_texScrollSpeed;
