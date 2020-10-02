@@ -157,6 +157,8 @@ namespace Q2Viewer
 				modelIndex++;
 			}
 			Log.Debug($"Visible models: {_models.Count}");
+			_lm.CompileLightmaps();
+			_lm.Dispose();
 
 			_reader.File.Dispose();
 		}
@@ -277,7 +279,6 @@ namespace Q2Viewer
 				tfgId++;
 				bufferOffset += count;
 			}
-			_lm.CompileLightmaps();
 			return mri;
 		}
 

@@ -8,7 +8,7 @@ using Veldrid;
 
 namespace Q2Viewer
 {
-	public class LightmapAllocator
+	public class LightmapAllocator : IDisposable
 	{
 		public const uint BlockSize = 4096;
 		public const uint LightmapsPerFace = 4;
@@ -178,16 +178,23 @@ namespace Q2Viewer
 
 		public void CompileLightmaps()
 		{
-			// TODO: Dispose staging textures
 			var cl = _gd.ResourceFactory.CreateCommandList();
 			cl.Begin();
 			foreach (var (data, target) in _lightmaps)
-				for (var i = 0; i < LightmapsPerFace; i++)
-					cl.CopyTexture(data.Staging, target);
+				cl.CopyTexture(data.Staging, target);
 			cl.End();
 
 			_gd.SubmitCommands(cl);
 		}
 
+		private bool _isDisposed = false;
+		public void Dispose()
+		{
+			if (_isDisposed) return;
+			_isDisposed = true;
+			foreach (var item in _lightmaps)
+				item.data.Staging.Dispose();
+			_lightmaps.Clear();
+		}
 	}
 }
