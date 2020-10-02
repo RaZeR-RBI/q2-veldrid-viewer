@@ -313,7 +313,9 @@ void main()
 	vec3 gamma = vec3(1.0 / 2.2);
 	vec3 rgb = pow(color, gamma);
 
-    float light = clamp(dot(fsin_normal, lightDir), 0.3, 1.0);
+	// half lambert with clamping
+	float light = dot(fsin_normal, lightDir) * 0.5 + 0.5;
+	light = clamp(light * light, 0.3, 1.0);
 
 	fsout_color = vec4(rgb * light, 1.0);
 }";
