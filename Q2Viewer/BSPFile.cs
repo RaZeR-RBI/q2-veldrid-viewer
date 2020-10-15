@@ -10,7 +10,7 @@ namespace Q2Viewer
 {
 	public class BSPFile : IDisposable
 	{
-		private const int HeaderSize = 152;
+		private const int HeaderSize = 4 + 4 + 8 * 19;
 
 		public readonly Lump<LRawValue> Entities; // LUMP_ENTITIES = 0
 		public readonly Lump<LPlane> Planes; // LUMP_PLANES = 1
@@ -95,7 +95,7 @@ namespace Q2Viewer
 				(o, l) => Areas.Read(stream, o, l),
 				(o, l) => AreaPortals.Read(stream, o, l)
 			};
-			for (int i = 0; i < 18; i++)
+			for (int i = 0; i < readers.Count; i++)
 			{
 				var offset = ReadInt32LittleEndian(lumps.Slice(i * 8));
 				var length = ReadInt32LittleEndian(lumps.Slice(i * 8 + 4));
