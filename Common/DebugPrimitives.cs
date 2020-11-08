@@ -63,8 +63,8 @@ void main()
 		private readonly DeviceBuffer _redCube;
 
 		private static readonly VertexLayoutDescription s_colorVertexLayout = new VertexLayoutDescription(
-			new VertexElementDescription("Position", VertexElementSemantic.Position, VertexElementFormat.Float3),
-			new VertexElementDescription("Color", VertexElementSemantic.Color, VertexElementFormat.Float3)
+			new VertexElementDescription("Position", VertexElementSemantic.TextureCoordinate, VertexElementFormat.Float3),
+			new VertexElementDescription("Color", VertexElementSemantic.TextureCoordinate, VertexElementFormat.Float3)
 		);
 
 		private readonly Pipeline _linePipeline;

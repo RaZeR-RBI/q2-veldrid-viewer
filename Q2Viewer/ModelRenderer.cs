@@ -13,14 +13,14 @@ namespace Q2Viewer
 	public class ModelRenderer
 	{
 		private static readonly VertexLayoutDescription s_lmVertexLayout = new VertexLayoutDescription(
-			new VertexElementDescription("Position", VertexElementSemantic.Position, VertexElementFormat.Float3),
-			new VertexElementDescription("Normal", VertexElementSemantic.Normal, VertexElementFormat.Float3),
+			new VertexElementDescription("Position", VertexElementSemantic.TextureCoordinate, VertexElementFormat.Float3),
+			new VertexElementDescription("Normal", VertexElementSemantic.TextureCoordinate, VertexElementFormat.Float3),
 			new VertexElementDescription("TexCoords", VertexElementSemantic.TextureCoordinate, VertexElementFormat.Float2),
 			new VertexElementDescription("LMCoords", VertexElementSemantic.TextureCoordinate, VertexElementFormat.Float2)
 		);
 
 		private static readonly VertexLayoutDescription s_vertexPosLayout = new VertexLayoutDescription(
-			new VertexElementDescription("Position", VertexElementSemantic.Position, VertexElementFormat.Float3)
+			new VertexElementDescription("Position", VertexElementSemantic.TextureCoordinate, VertexElementFormat.Float3)
 		);
 
 		private struct CommonShaderParams
@@ -132,7 +132,7 @@ namespace Q2Viewer
 				));
 
 			_noBlendPipeline = factory.CreateGraphicsPipeline(new GraphicsPipelineDescription(
-				BlendStateDescription.Empty,
+				BlendStateDescription.SingleDisabled,
 				DepthStencilStateDescription.DepthOnlyLessEqual,
 				RasterizerStateDescription.Default,
 				PrimitiveTopology.TriangleList,
@@ -204,7 +204,7 @@ namespace Q2Viewer
 			));
 
 			_skyboxPipeline = factory.CreateGraphicsPipeline(new GraphicsPipelineDescription(
-				BlendStateDescription.SingleAlphaBlend,
+				BlendStateDescription.SingleDisabled,
 				DepthStencilStateDescription.DepthOnlyLessEqual,
 				// RasterizerStateDescription.Default,
 				new RasterizerStateDescription(FaceCullMode.None, PolygonFillMode.Solid, FrontFace.Clockwise, true, true),
