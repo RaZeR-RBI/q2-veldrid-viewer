@@ -38,8 +38,8 @@ namespace MD2Viewer
 		}
 
 		private static readonly VertexLayoutDescription s_ntVertexLayout = new VertexLayoutDescription(
-			new VertexElementDescription("Position", VertexElementSemantic.Position, VertexElementFormat.Float3),
-			new VertexElementDescription("Normal", VertexElementSemantic.Normal, VertexElementFormat.Float3),
+			new VertexElementDescription("Position", VertexElementSemantic.TextureCoordinate, VertexElementFormat.Float3),
+			new VertexElementDescription("Normal", VertexElementSemantic.TextureCoordinate, VertexElementFormat.Float3),
 			new VertexElementDescription("TexCoords", VertexElementSemantic.TextureCoordinate, VertexElementFormat.Float2)
 		);
 
@@ -147,7 +147,7 @@ namespace MD2Viewer
 				));
 
 			_pipeline = rf.CreateGraphicsPipeline(new GraphicsPipelineDescription(
-				BlendStateDescription.Empty,
+				BlendStateDescription.SingleDisabled,
 				DepthStencilStateDescription.DepthOnlyLessEqual,
 				RasterizerStateDescription.Default,
 				PrimitiveTopology.TriangleList,

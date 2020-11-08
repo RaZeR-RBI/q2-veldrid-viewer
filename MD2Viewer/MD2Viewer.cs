@@ -35,7 +35,8 @@ namespace MD2Viewer
 				resourceBindingModel: ResourceBindingModel.Improved,
 				preferDepthRangeZeroToOne: true,
 				preferStandardClipSpaceYDirection: true
-			)
+			),
+			preferredBackend: options.Backend
 		)
 		{
 			_options = options;

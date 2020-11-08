@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using CommandLine;
+using Veldrid;
 
 namespace MD2Viewer
 {
@@ -11,6 +12,9 @@ namespace MD2Viewer
 
 		[Option('p', "paks", Required = false, HelpText = "List of paths to .pak files")]
 		public IEnumerable<string> PakPaths { get; set; }
+
+		[Option('b', "backend", Required = false, HelpText = "Backend to use (Direct3D11, OpenGL, OpenGLES, Vulkan, Metal)")]
+		public GraphicsBackend? Backend { get; set; }
 	}
 
 	class Program
