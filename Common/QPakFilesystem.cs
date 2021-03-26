@@ -152,6 +152,8 @@ namespace Common
 		public bool Exists(FileSystemPath path)
 		{
 			CheckDisposed();
+			if (path.IsRoot) return true;
+			if (path.IsDirectory) return _entries.Keys.Any(p => p.IsChildOf(path));
 			if (path.IsFile) return _entries.ContainsKey(path);
 			return _entries.Keys.Any(p => p.Equals(path) || p.IsParentOf(path));
 		}
