@@ -19,7 +19,7 @@ namespace Tests
 				var expectedEntities = "{\n\"_tb_textures\" \"textures/e1u1\"\n\"classname\" \"worldspawn\"\n}\n{\n\"origin\" \"-0 -0 40\"\n\"classname\" \"info_player_start\"\n}\n{\n\"origin\" \"-40 -40 88\"\n\"classname\" \"light\"\n}\n\0";
 
 				bsp.EntitiesString.Should().Be(expectedEntities);
-				bsp.AreaPortals.Length.Should().Be(0);
+				bsp.AreaPortals.Length.Should().Be(1);
 				bsp.Areas.Length.Should().Be(2);
 				bsp.Nodes.Length.Should().Be(27);
 				bsp.Faces.Length.Should().Be(16);
